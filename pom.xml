@@ -1,0 +1,87 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>it.uniroma3</groupId>
+  <artifactId>url-classification-streaming</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>url-classification-streaming</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <dependencies>   
+  
+	<dependency>
+    <groupId>org.apache.spark</groupId>
+    <artifactId>spark-streaming_2.11</artifactId>
+    <version>2.3.2</version>
+    <scope>provided</scope>
+</dependency>
+
+<dependency>
+    <groupId>org.apache.spark</groupId>
+    <artifactId>spark-streaming-kafka-0-10_2.11</artifactId>
+    <version>2.3.2</version>
+</dependency>
+
+<dependency>
+    <groupId>org.apache.kafka</groupId>
+    <artifactId>kafka_2.12</artifactId>
+    <version>2.0.0</version>
+</dependency>
+
+<dependency>
+    <groupId>commons-configuration</groupId>
+    <artifactId>commons-configuration</artifactId>
+    <version>1.10</version>
+</dependency>
+
+<dependency>
+    <groupId>com.fasterxml.jackson.core</groupId>
+    <artifactId>jackson-databind</artifactId>
+    <version>2.6.5</version>
+</dependency>
+
+<dependency>
+    <groupId>org.mongodb</groupId>
+    <artifactId>mongo-java-driver</artifactId>
+    <version>3.8.2</version>
+</dependency>
+
+<dependency>
+    <groupId>org.mongodb.spark</groupId>
+    <artifactId>mongo-spark-connector_2.11</artifactId>
+    <version>2.3.0</version>
+</dependency>
+
+<dependency>
+    <groupId>org.apache.spark</groupId>
+    <artifactId>spark-sql_2.11</artifactId>
+    <version>2.3.2</version>
+</dependency>
+
+	<dependency>
+        <groupId>edu.uci.ics</groupId>
+        <artifactId>crawler4j</artifactId>
+        <version>4.4.0</version>
+    </dependency>
+    
+    <dependency>
+    <groupId>com.google.guava</groupId>
+    <artifactId>guava</artifactId>
+    <version>15.0</version>
+</dependency>
+
+<dependency>
+    <groupId>org.neo4j.driver</groupId>
+    <artifactId>neo4j-java-driver</artifactId>
+    <version>1.6.3</version>
+</dependency>
+
+  </dependencies>
+</project>
