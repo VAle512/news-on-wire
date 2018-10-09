@@ -8,10 +8,6 @@ import java.util.Properties;
 import org.apache.log4j.Logger;
 
 public class PropertiesReader {
-	/* BATCH ANALYSIS */
-	public static final String BATCH_TIMEUNIT = "batch.timeunit";
-	public static final String BATCH_TIME_TO_WAIT = "batch.timetowait";
-	
 	/* MONGO DB */
 	public static final String MONGODB_HOST_ADDRESS = "mongodb.host.address";
 	public static final String MONGODB_HOST_PORT = "mongodb.host.port";
@@ -27,34 +23,31 @@ public class PropertiesReader {
 	public static final String SPARK_MASTER = "spark.master";
 	public static final String SPARK_LOG_LEVEL = "spark.logLevel";
 	public static final String SPARK_REPARTITION_LEVEL = "spark.repartition.level";
-	
-	/* KAFKA */
-	public static final String KAFKA_BOOTSRAP_SERVERS = "kafka.bootstrap.servers";
-	public static final String KAFKA_KEY_SERIALIZER = "kafka.key.serializer";
-	public static final String KAFKA_KEY_DESERIALIZER = "kafka.key.deserializer";
-	public static final String KAFKA_VALUE_SERIALIZER = "kafka.value.serializer";
-	public static final String KAFKA_VALUE_DESERIALIZER = "kafka.value.deserializer";
-	public static final String KAFKA_GROUP_ID = "kafka.group.id";
-	public static final String KAFKA_TOPIC = "kafka.topic";
-	
-	/*GATHERER */
-	public static final String GATHERER_TIMEUNIT = "gatherer.timeunit";
-	public static final String GATHERER_TIME_TO_WAIT = "gatherer.timetowait";
-	public static final String GATHERER_ENTRY_POINT = "gatherer.entryPoint";
-	public static final String GATHERER_EXCLUDE_LIST = "gatherer.excludeList";
-	public static final String GATHERER_TIMEOUT_KILL = "gatherer.timeoutKill";
-	public static final String GATHERER_DEPTH_LEVEL = "gatherer.depthLevel";
-	public static final String GATHERER_STABILITY_THRESHOLD = "gatherer.stabilityThreshold";
-	public static final String GATHERER_DEPTH_INCREMENT_THRESHOLD = "gatherer.depth.incrementThreshold";
-	public static final String GATHERER_DEPTH_DECREMENT_THRESHOLD = "gatherer.depth.decrementThreshold";
-	public static final String GATHERER_DEPTH_STEPSIZE = "gatherer.depth.stepsize";
-	public static final String GATHERER_DOMAIN = "gatherer.domain";
-	public static final String GATHERER_WRITE_ON_FILE = "gatherer.writeonFile";
-	
+	public static final String SPARK_NEO4J_URI = "spark.neo4j.bolt.uri";
+	public static final String SPARK_NEO4J_USER = "spark.neo4j.bolt.user";
+	public static final String SPARK_NEO4J_PASSWORD = "spark.neo4j.bolt.password";
+
 	/* PAGE RANK */
 	public static final String PAGE_RANK_GRAPH_GENERATOR_FILE = "pagerank.graphGenerator.file";
 	public static final String PAGE_RANK_GRAPH_GENERATOR_DEPTH = "pagerank.graphGenerator.depth";
 	public static final String PAGE_RANK_ITERATIONS = "pagerank.iterations";
+	
+	/* CRAWLER */
+	public static final String CRAWLER_TIMEUNIT = "crawler.timeunit";
+	public static final String CRAWLER_TIME_TO_WAIT = "crawler.timetowait";
+	public static final String CRAWLER_DEPTH = "crawler.depth";
+	public static final String CRAWLER_NUM_CRAWLERS = "crawler.numCrawlers";
+	public static final String CRAWLER_STORAGE = "crawler.storageFolder";
+	public static final String CRAWLER_SEEDS = "crawler.seeds";
+	public static final String CRAWLER_EXCLUDE_LIST = "crawler.excludeList";
+	public static final String CRAWLER_DOMAIN = "crawler.domain";
+	public static final String CRAWLER_WRITE_ON_FILE = "crawler.writeonFile";
+	public static final String CRAWLER_FILE_TO_WRITE_ON = "crawler.writeon";
+	
+	/* NEO4J */
+	public static final String NEO4J_URI = "neo4j.uri";
+	public static final String NEO4J_USER = "neo4j.user";
+	public static final String NEO4J_PASSWORD = "neo4j.password";
 
 	
 	private final Logger logger = Logger.getLogger(this.getClass().getName());

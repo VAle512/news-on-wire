@@ -6,8 +6,6 @@ import static it.uniroma3.properties.PropertiesReader.MONGODB_DB_NAME;
 import static it.uniroma3.properties.PropertiesReader.MONGODB_HOST_ADDRESS;
 import static it.uniroma3.properties.PropertiesReader.MONGODB_HOST_PORT;
 import static it.uniroma3.properties.PropertiesReader.MONGODB_INPUT_COLLECTION;
-import static it.uniroma3.properties.PropertiesReader.MONGODB_RESULTS_COLLECTION;
-import static it.uniroma3.properties.PropertiesReader.GATHERER_STABILITY_THRESHOLD;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -94,20 +92,4 @@ public class RepositoryDAO {
 		return this.collection.findOne(new BasicDBObject("url", url));
 	}
 	
-	public boolean isStored(String url, String snapshotCounter) {
-		DBObject found = (this.collection.findOne(new BasicDBObject().append("url", url).append("snapshot", new BasicDBObject("$ne", "S"+snapshotCounter))));
-		if(found!=null)
-			System.out.println(found.get("snapshot") + " -- " + snapshotCounter);
-		return found!=null;
-	}
-	
-	public boolean isStable(String url) {
-		DBCollection stabilityCollection = this.db.getCollection(propsReader.getProperty(MONGODB_RESULTS_COLLECTION));
-		Double stabilityThreshold = Double.parseDouble(propsReader.getProperty(GATHERER_STABILITY_THRESHOLD));
-		DBObject found = stabilityCollection.findOne(new BasicDBObject("url", url).append("stability", new BasicDBObject("$gte", stabilityThreshold)));
-		if(found != null)
-			System.out.println("url: " + url);
-		return found != null;
-	}
-
 }

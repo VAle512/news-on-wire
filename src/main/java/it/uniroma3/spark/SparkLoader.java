@@ -1,4 +1,4 @@
-package it.uniroma3.batch.utils;
+package it.uniroma3.spark;
 
 import static it.uniroma3.properties.PropertiesReader.MONGODB_DB_NAME;
 import static it.uniroma3.properties.PropertiesReader.MONGODB_HOST_ADDRESS;
@@ -6,6 +6,9 @@ import static it.uniroma3.properties.PropertiesReader.MONGODB_INPUT_COLLECTION;
 import static it.uniroma3.properties.PropertiesReader.MONGODB_RESULTS_COLLECTION;
 import static it.uniroma3.properties.PropertiesReader.SPARK_APP_NAME;
 import static it.uniroma3.properties.PropertiesReader.SPARK_MASTER;
+import static it.uniroma3.properties.PropertiesReader.SPARK_NEO4J_URI;
+import static it.uniroma3.properties.PropertiesReader.SPARK_NEO4J_USER;
+import static it.uniroma3.properties.PropertiesReader.SPARK_NEO4J_PASSWORD;
 //import static it.uniroma3.properties.PropertiesReader.SPARK_LOG_LEVEL;
 
 import org.apache.spark.SparkConf;
@@ -34,7 +37,10 @@ public class SparkLoader {
 		SparkConf sparkConf = new SparkConf().setAppName(propsReader.getProperty(SPARK_APP_NAME))
 											 .setMaster(propsReader.getProperty(SPARK_MASTER))
 											 .set("spark.mongodb.input.uri", mongodbSparkInput)
-											 .set("spark.mongodb.output.uri", mongodbSparkOutput);
+											 .set("spark.mongodb.output.uri", mongodbSparkOutput)
+											 .set(SPARK_NEO4J_URI, propsReader.getProperty(SPARK_NEO4J_URI))
+											 .set(SPARK_NEO4J_USER, propsReader.getProperty(SPARK_NEO4J_USER))
+											 .set(SPARK_NEO4J_PASSWORD, propsReader.getProperty(SPARK_NEO4J_PASSWORD));
 		
 		this.jsc = new JavaSparkContext(sparkConf);
 	
