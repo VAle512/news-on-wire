@@ -9,43 +9,13 @@
 
     <name>url-classification-streaming</name>
     <url>http://maven.apache.org</url>
-
+	
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <jaxb-api.version>2.3.0</jaxb-api.version>
     </properties>
 
-    <dependencies>    
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-streaming_2.11</artifactId>
-            <version>2.3.2</version>
-            <scope>provided</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-streaming-kafka-0-10_2.11</artifactId>
-            <version>2.3.2</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_2.12</artifactId>
-            <version>2.0.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>commons-configuration</groupId>
-            <artifactId>commons-configuration</artifactId>
-            <version>1.10</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.6.5</version>
-        </dependency>
-
+    <dependencies>           
         <dependency>
             <groupId>org.mongodb</groupId>
             <artifactId>mongo-java-driver</artifactId>
@@ -81,18 +51,30 @@
             <artifactId>neo4j-java-driver</artifactId>
             <version>1.6.3</version>
         </dependency>
-
+        
         <dependency>
-            <groupId>neo4j-contrib</groupId>
-            <artifactId>neo4j-spark-connector</artifactId>
-            <version>2.1.0-M4</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.json</groupId>
-            <artifactId>json</artifactId>
-            <version>20180813</version>
-        </dependency>
+    		<groupId>org.jsoup</groupId>
+    		<artifactId>jsoup</artifactId>
+    		<version>1.11.3</version>
+		</dependency>
+		
+		<dependency>
+    		<groupId>org.jooq</groupId>
+    		<artifactId>joox</artifactId>
+    		<version>1.5.0</version>
+		</dependency>
+		
+    	<dependency>
+    		<groupId>mysql</groupId>
+    		<artifactId>mysql-connector-java</artifactId>
+    		<version>8.0.12</version>
+		</dependency>
+		
+		<dependency>
+    		<groupId>org.apache.commons</groupId>
+    		<artifactId>commons-dbcp2</artifactId>
+    		<version>2.5.0</version>
+		</dependency>
     </dependencies>
 
     <repositories>

@@ -54,6 +54,11 @@ public class SparkLoader {
 		return this.jsc;
 	}
 	
+	public void close() {
+		this.jsc.stop();
+		this.jsc.close();
+	}
+	
 	public static SparkLoader getInstance() {
 		return (instance==null) ? (instance = new SparkLoader()) : instance;
 	}

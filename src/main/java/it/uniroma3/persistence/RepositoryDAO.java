@@ -50,11 +50,19 @@ public class RepositoryDAO {
 		}
 	}
 	
-	public void insertURLWithSnapshot(String url, String snapshot) {
+	public void insertURLWithSnapshot(String url, int snapshot) {
 		BasicDBObject urlObject = new BasicDBObject().append("url", url);
-		urlObject = urlObject.append("snapshot", "S"+snapshot);
+		urlObject = urlObject.append("snapshot", snapshot);
 		if(this.collection.findOne(urlObject)==null)
-			this.collection.insert(urlObject.append("latestUpdate", new Date()));
+			this.collection.insert(urlObject);
+	}
+	
+	public void insertURL(String url) {
+		int snapshot = this.getNextSequence();
+		BasicDBObject urlObject = new BasicDBObject().append("url", url);
+		urlObject = urlObject.append("snapshot", snapshot);
+		if(this.collection.findOne(urlObject)==null)
+			this.collection.insert(urlObject);
 	}
 
 	public static RepositoryDAO getInstance() {
@@ -77,6 +85,17 @@ public class RepositoryDAO {
 		}
 	}
 	
+	public Integer getCurrentSequence() {
+		DBCollection sequenceCollection = this.db.getCollection(propsReader.getProperty(MONGODB_COUNTER_COLLECTION));
+		DBObject sequenceObject = sequenceCollection.findOne(new BasicDBObject("_id", propsReader.getProperty(MONGODB_COUNTER_ID)));
+		if(sequenceObject != null) {
+			Integer counter = ((Double)sequenceObject.get("sequence_variable")).intValue();
+			return counter;
+		} else {
+			return null;
+		}
+	}
+	
 	public List<String> getSnapshots() {
 		DBCollection sequenceCollection = this.db.getCollection(propsReader.getProperty(MONGODB_COUNTER_COLLECTION));
 		DBObject sequenceObject = sequenceCollection.findOne(new BasicDBObject("_id", propsReader.getProperty(MONGODB_COUNTER_ID)));
@@ -86,6 +105,17 @@ public class RepositoryDAO {
 			snapshots.add("S"+i);
 		
 		return snapshots;
+	}
+	
+	public void insertLinkOccourrence(String pageFrom, String href, String absolute, String xpath, int snapshot) {
+		DBCollection linksCollection = this.db.getCollection("LinkOccurrencesNew");
+		DBObject linkObject = new BasicDBObject().append("page", pageFrom)
+				                             .append("relative", href)
+				                             .append("absolute", absolute)
+				                             .append("xpath", xpath)
+				                             .append("snapshot", snapshot);
+		
+		linksCollection.insert(linkObject);
 	}
 	
 	public DBObject findByURL(String url) {

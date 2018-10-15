@@ -22,6 +22,7 @@ import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
 import it.uniroma3.graphs.Graph;
 import it.uniroma3.graphs.Arch;
 import it.uniroma3.persistence.GraphsDAO;
+import it.uniroma3.persistence.MySQLRepositoryDAO;
 import it.uniroma3.properties.PropertiesReader;
 
 /**
@@ -39,7 +40,9 @@ public class GraphController {
 	private static final int numCrawlers = Integer.parseInt(propsReader.getProperty(CRAWLER_NUM_CRAWLERS));
 	private static final int maxDepth = Integer.parseInt(propsReader.getProperty(CRAWLER_DEPTH));
 	private static final boolean writeOnFile = Boolean.parseBoolean(propsReader.getProperty(CRAWLER_WRITE_ON_FILE));
-	private static final boolean writeOnDB = false;
+	private static final boolean writeOnDB = true;
+	private static final boolean writeOnGraphDB = false;
+	
 
 	/**
 	 * Crawls a website from a given url and maximum depth, provided both in the configuration file.
@@ -49,6 +52,8 @@ public class GraphController {
 	 */
 	@SuppressWarnings("unchecked")
 	public static Graph crawlAndBuild() throws Exception {
+		MySQLRepositoryDAO.getInstance().incrementSequence();
+		
 		CrawlConfig config = new CrawlConfig();
 		config.setCrawlStorageFolder(storage);
 		config.setMaxDepthOfCrawling(maxDepth);
@@ -76,23 +81,25 @@ public class GraphController {
 		 * Start the crawl. This is a blocking operation, meaning that your code
 		 * will reach the line after this only when crawling is finished.
 		 */
+		
 		controller.start(SpiderCrawler.class, numCrawlers);
 		controller.getCrawlersLocalData().stream()
 										 .map(x -> (Set<Arch>) x)
 										 .flatMap(set -> set.stream())
 										 .forEach(arch -> {
 											 		graph.addArch(arch);
-											 		if(writeOnDB)
+											 		if(writeOnGraphDB)
 											 			GraphsDAO.getInstance().addRelationship(arch.getFromNode(), arch.getToNode());
 											 		if(writeOnFile) {
-													try {
-														Files.append(arch.toCouple(), fileToWriteOn, StandardCharsets.UTF_8);
-														Files.append("\n", fileToWriteOn, StandardCharsets.UTF_8);
-													}catch(Exception e) {
-														logger.error("Error while writing on file!");
-													}
-										 }});
-		GraphsDAO.getInstance().close();
+														try {
+															Files.append(arch.toCouple(), fileToWriteOn, StandardCharsets.UTF_8);
+															Files.append("\n", fileToWriteOn, StandardCharsets.UTF_8);
+														}catch(Exception e) {
+															logger.error("Error while writing on file!");
+														}
+							}});
+		if(writeOnGraphDB)		
+			GraphsDAO.getInstance().close();
 		return graph;
 
 	}

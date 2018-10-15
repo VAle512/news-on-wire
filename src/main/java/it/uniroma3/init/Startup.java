@@ -1,28 +1,32 @@
 package it.uniroma3.init;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 
-import org.spark_project.guava.io.Files;
-
-import it.uniroma3.classifier.PagesClassifier;
-import it.uniroma3.graphs.Graph;
-import it.uniroma3.graphs.GraphLoader;
+import it.uniroma3.analysis.StabilityAnalysis;
+import it.uniroma3.crawling.GraphController;
+import it.uniroma3.persistence.MySQLRepositoryDAO;
+import it.uniroma3.spark.SparkLoader;
 
 public class Startup {
 
 	public static void main(String[] args) throws Exception {
-		Graph graph = GraphLoader.load();
-		PagesClassifier.classify(graph);
-		graph.getGraphNodes().forEach(node -> {
-			try {
-				Files.append(node + System.lineSeparator(), new File("/home/Scrivania/classificationResults"), StandardCharsets.UTF_8);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		});
+		MySQLRepositoryDAO.getInstance().createStabilityTable();
+		StabilityAnalysis.analyze();
+		System.exit(0);
+//		StabilityAnalysis.analyze();
+//		System.exit(0);
+//		MySQLRepositoryDAO.getInstance().createURLsTable();
+//		MySQLRepositoryDAO.getInstance().createSequence();
+//		MySQLRepositoryDAO.getInstance().createLinkOccourrencesTable();
+		for (int i = 0; i < 14; ++i) {
+			GraphController.crawlAndBuild();
+//			//StabilityAnalysis.analyze();
+//			System.out.println("Waiting 20 seconds.");
+			System.out.println("Waiting...");
+			Thread.sleep(TimeUnit.MILLISECONDS.convert(30, TimeUnit.MINUTES));
+		}	
+//		SparkLoader.getInstance().close();
+			
 	}
 
 }
