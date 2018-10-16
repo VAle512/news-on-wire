@@ -1,32 +1,29 @@
 package it.uniroma3.init;
 
+import static it.uniroma3.properties.PropertiesReader.CRAWLER_TIMEUNIT;
+import static it.uniroma3.properties.PropertiesReader.CRAWLER_TIME_TO_WAIT;
+
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.Logger;
+
 import it.uniroma3.analysis.StabilityAnalysis;
-import it.uniroma3.crawling.GraphController;
-import it.uniroma3.persistence.MySQLRepositoryDAO;
-import it.uniroma3.spark.SparkLoader;
+import it.uniroma3.crawling.CrawlingDriver;
+import it.uniroma3.crawling.SpiderCrawler;
+import it.uniroma3.properties.PropertiesReader;
 
 public class Startup {
-
+	private static final Logger logger = Logger.getLogger(SpiderCrawler.class);
+	private static final PropertiesReader propsReader = PropertiesReader.getInstance();
+	private static final TimeUnit TIME_UNIT = TimeUnit.valueOf(propsReader.getProperty(CRAWLER_TIMEUNIT));
+	private static final long TIME_TO_WAIT = Long.parseLong(propsReader.getProperty(CRAWLER_TIME_TO_WAIT));
+	
 	public static void main(String[] args) throws Exception {
-		MySQLRepositoryDAO.getInstance().createStabilityTable();
-		StabilityAnalysis.analyze();
-		System.exit(0);
-//		StabilityAnalysis.analyze();
-//		System.exit(0);
-//		MySQLRepositoryDAO.getInstance().createURLsTable();
-//		MySQLRepositoryDAO.getInstance().createSequence();
-//		MySQLRepositoryDAO.getInstance().createLinkOccourrencesTable();
 		for (int i = 0; i < 14; ++i) {
-			GraphController.crawlAndBuild();
-//			//StabilityAnalysis.analyze();
-//			System.out.println("Waiting 20 seconds.");
-			System.out.println("Waiting...");
-			Thread.sleep(TimeUnit.MILLISECONDS.convert(30, TimeUnit.MINUTES));
+			CrawlingDriver.crawl();
+			logger.info("Waiting for " + TIME_TO_WAIT + " " + TIME_UNIT.toString().toLowerCase() + ".");
+			Thread.sleep(TimeUnit.MILLISECONDS.convert(TIME_TO_WAIT, TIME_UNIT));
 		}	
-//		SparkLoader.getInstance().close();
-			
 	}
 
 }

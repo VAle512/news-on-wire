@@ -7,17 +7,13 @@ import java.util.Properties;
 
 import org.apache.log4j.Logger;
 
+/**
+ * This class models a simple properties reader. 
+ * The file we have to edit is 'application.properties' located under 'resources'. 
+ * @author Luigi D'Onofrio
+ *
+ */
 public class PropertiesReader {
-	/* MONGO DB */
-	public static final String MONGODB_HOST_ADDRESS = "mongodb.host.address";
-	public static final String MONGODB_HOST_PORT = "mongodb.host.port";
-	public static final String MONGODB_DB_NAME = "mongodb.dbName";
-	public static final String MONGODB_INPUT_COLLECTION = "mongodb.inputCollection";
-	public static final String MONGODB_RESULTS_COLLECTION = "mongodb.resultsCollection";
-	public static final String MONGODB_COUNTER_COLLECTION = "mongodb.counterCollection";
-	public static final String MONGODB_COUNTER_ID = "mongodb.counterID";
-	public static final String MONGODB_RANKS_COLLECTION = "mongodb.ranksCollection";
-	
 	/* SPARK */
 	public static final String SPARK_APP_NAME = "spark.appName";
 	public static final String SPARK_MASTER = "spark.master";
@@ -26,11 +22,6 @@ public class PropertiesReader {
 	public static final String SPARK_NEO4J_URI = "spark.neo4j.bolt.uri";
 	public static final String SPARK_NEO4J_USER = "spark.neo4j.bolt.user";
 	public static final String SPARK_NEO4J_PASSWORD = "spark.neo4j.bolt.password";
-
-	/* PAGE RANK */
-	public static final String PAGE_RANK_GRAPH_GENERATOR_FILE = "pagerank.graphGenerator.file";
-	public static final String PAGE_RANK_GRAPH_GENERATOR_DEPTH = "pagerank.graphGenerator.depth";
-	public static final String PAGE_RANK_ITERATIONS = "pagerank.iterations";
 	
 	/* CRAWLER */
 	public static final String CRAWLER_TIMEUNIT = "crawler.timeunit";
@@ -44,35 +35,47 @@ public class PropertiesReader {
 	public static final String CRAWLER_WRITE_ON_FILE = "crawler.writeonFile";
 	public static final String CRAWLER_FILE_TO_WRITE_ON = "crawler.writeon";
 	
-	/* NEO4J */
-	public static final String NEO4J_URI = "neo4j.uri";
-	public static final String NEO4J_USER = "neo4j.user";
-	public static final String NEO4J_PASSWORD = "neo4j.password";
-
+	/* MYSQL */
+	public static final String MYSQL_JDBC_DRIVER = "mysql.jdbc.driver";  
+	public static final String MYSQL_DB_URL = "mysql.uri";
+	public static final String MYSQL_USER = "mysql.user";
+	public static final String MYSQL_PASS = "mysql.password";
+	public static final String MYSQL_URLS_TABLE_NAME = "mysql.tables.urls";
+	public static final String MYSQL_STABILITY_TABLE_NAME = "mysql.tables.stability";
+	public static final String MYSQL_LINKS_TABLE_NAME = "mysql.tables.links";
+	public static final String MYSQL_SEQUENCE_TABLE_NAME = "mysql.tables.sequence";
+	public static final String MYSQL_SEQUENCE_ID = "mysql.tables.sequence.id";
 	
 	private final Logger logger = Logger.getLogger(this.getClass().getName());
 	private static PropertiesReader instance;
 	private Properties properties;
 	
+	/**
+	 * Constructor.
+	 */
 	public PropertiesReader() {
 		this.properties = new Properties();	
 		try {
-			this.properties.load(new FileInputStream(new File("./resources/application.properties")));
+			this.properties.load(new FileInputStream(new File("./src/main/resources/application.properties")));
 		} catch (IOException e) {
 			logger.error(e.getMessage());
 		}		
 	}
 	
-	public static PropertiesReader getInstance() {
-		return (instance == null) ? (instance = new PropertiesReader()) : instance;
-	}
-	
+	/**
+	 * Retrieves the property specified by the provided key.
+	 * @param key is the key associated with the property we want to retrieve.
+	 * @return the property value associated to key.
+	 */
 	public String getProperty(String key) {
 		return this.properties.getProperty(key);
 	}
 	
-	public void setProperty(String key, String value) {
-		this.properties.setProperty(key, value);
+	/**
+	 * @return a reference the the Singleton instance representing this object.
+	 */
+	public static PropertiesReader getInstance() {
+		return (instance == null) ? (instance = new PropertiesReader()) : instance;
 	}
 	
 }
