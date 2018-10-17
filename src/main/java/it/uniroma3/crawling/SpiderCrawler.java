@@ -3,11 +3,10 @@ package it.uniroma3.crawling;
 import static it.uniroma3.properties.PropertiesReader.CRAWLER_EXCLUDE_LIST;
 import static org.joox.JOOX.$;
 
-import java.io.File;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.log4j.Logger;
@@ -16,8 +15,6 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Document.OutputSettings.Syntax;
 import org.jsoup.nodes.Entities.EscapeMode;
 import org.jsoup.safety.Whitelist;
-
-import com.google.common.io.Files;
 
 import edu.uci.ics.crawler4j.crawler.Page;
 import edu.uci.ics.crawler4j.crawler.WebCrawler;
@@ -37,6 +34,8 @@ public class SpiderCrawler extends WebCrawler {
 	private static final Logger logger = Logger.getLogger(SpiderCrawler.class);
 	private static final PropertiesReader propsReader = PropertiesReader.getInstance();
 	private final static Pattern FILTERS = Pattern.compile(".*(\\.(" + propsReader.getProperty(CRAWLER_EXCLUDE_LIST).replaceAll(",", "|") + "))$");
+	private final static Pattern WEB_ARCHIVE_ABS_PATTERN = Pattern.compile("^(http(s)?:\\/\\/.*)(http(s)?.*)");
+	private final static Pattern WEB_ARCHIVE_REL_PATTERN = Pattern.compile("^(\\/web\\/\\d+\\/)(http(s)?.*)");
 	private static Connection connection = MySQLRepositoryDAO.getConnection();
 	
 	/* (non-Javadoc)
@@ -87,6 +86,7 @@ public class SpiderCrawler extends WebCrawler {
 			doc.outputSettings().escapeMode(EscapeMode.xhtml)
 								.syntax(Syntax.xml)
 								.charset(StandardCharsets.UTF_8);
+			
 			/* Convert the previous document into a format parsable by the jOOX library. */
 			org.w3c.dom.Document document = $(doc.html()).document();
 			
@@ -109,9 +109,9 @@ public class SpiderCrawler extends WebCrawler {
 										logger.info(e.getMessage() + " for URL: " + webUrl.getURL());
 									}
 					
-									String href = webUrl.getPath();
-									String absolute = webUrl.getURL();
-									String referringPage = page.getWebURL().getURL();
+									String href = unifySpace(webUrl.getPath());
+									String absolute = unifySpace(webUrl.getURL());
+									String referringPage = unifySpace(page.getWebURL().getURL());
 									
 									/* Write both the URL and the annexed link occurrence. */ 
 									MySQLRepositoryDAO.getInstance().insertURL(connection, absolute);
@@ -121,8 +121,20 @@ public class SpiderCrawler extends WebCrawler {
 		}
 	}
 	
-	
 	private String preprocessURLForWebArchive(String url) {
 		return (url.matches(".+(http:\\/)[a-z].*")) ? url.replaceAll("http:\\/", "http://") : url;
+	}
+	
+	private static String unifySpace(String url) {
+		Matcher matcher = null;
+		if(url.startsWith("http")) //Not relative		
+			matcher = WEB_ARCHIVE_ABS_PATTERN.matcher(url);
+		else //Relative
+			matcher = WEB_ARCHIVE_REL_PATTERN.matcher(url); 
+		
+		if(matcher.find())
+			return matcher.group(2);
+		else
+			return url;
 	}
 }
