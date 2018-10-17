@@ -7,9 +7,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 
-import it.uniroma3.analysis.StabilityAnalysis;
 import it.uniroma3.crawling.CrawlingDriver;
 import it.uniroma3.crawling.SpiderCrawler;
+import it.uniroma3.persistence.MySQLRepositoryDAO;
 import it.uniroma3.properties.PropertiesReader;
 
 public class Startup {
@@ -19,6 +19,7 @@ public class Startup {
 	private static final long TIME_TO_WAIT = Long.parseLong(propsReader.getProperty(CRAWLER_TIME_TO_WAIT));
 	
 	public static void main(String[] args) throws Exception {
+		MySQLRepositoryDAO.getInstance().resetAll();
 		for (int i = 0; i < 14; ++i) {
 			CrawlingDriver.crawl();
 			logger.info("Waiting for " + TIME_TO_WAIT + " " + TIME_UNIT.toString().toLowerCase() + ".");

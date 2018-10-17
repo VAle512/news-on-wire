@@ -16,6 +16,7 @@ import edu.uci.ics.crawler4j.crawler.CrawlController;
 import edu.uci.ics.crawler4j.fetcher.PageFetcher;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtConfig;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
+import edu.uci.ics.crawler4j.url.WebURL;
 import it.uniroma3.persistence.MySQLRepositoryDAO;
 import it.uniroma3.properties.PropertiesReader;
 
@@ -28,7 +29,7 @@ public class CrawlingDriver {
 	@SuppressWarnings("unused")
 	private static final Logger logger = Logger.getLogger(CrawlingDriver.class);
 	private static final PropertiesReader propsReader = PropertiesReader.getInstance();
-	private static final File SEEDS = new File("./resources/" + propsReader.getProperty(CRAWLER_SEEDS));
+	private static final File SEEDS = new File("./src/main/resources/" + propsReader.getProperty(CRAWLER_SEEDS));
 	private static final String STORAGE = propsReader.getProperty(CRAWLER_STORAGE);
 	private static final int NUM_CRAWLERS = Integer.parseInt(propsReader.getProperty(CRAWLER_NUM_CRAWLERS));
 	private static final int MAX_DEPTH = Integer.parseInt(propsReader.getProperty(CRAWLER_DEPTH));
@@ -48,6 +49,7 @@ public class CrawlingDriver {
 		 */
 		PageFetcher pageFetcher = new PageFetcher(config);
 		RobotstxtConfig robotstxtConfig = new RobotstxtConfig();
+		robotstxtConfig.setEnabled(false);
 		RobotstxtServer robotstxtServer = new RobotstxtServer(robotstxtConfig, pageFetcher);
 		CrawlController controller = new CrawlController(config, pageFetcher, robotstxtServer);
 

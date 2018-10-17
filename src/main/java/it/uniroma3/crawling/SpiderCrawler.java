@@ -3,6 +3,8 @@ package it.uniroma3.crawling;
 import static it.uniroma3.properties.PropertiesReader.CRAWLER_EXCLUDE_LIST;
 import static org.joox.JOOX.$;
 
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.util.Set;
@@ -14,6 +16,8 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Document.OutputSettings.Syntax;
 import org.jsoup.nodes.Entities.EscapeMode;
 import org.jsoup.safety.Whitelist;
+
+import com.google.common.io.Files;
 
 import edu.uci.ics.crawler4j.crawler.Page;
 import edu.uci.ics.crawler4j.crawler.WebCrawler;
@@ -53,7 +57,10 @@ public class SpiderCrawler extends WebCrawler {
 								&& ((href.contains("www.foggiatoday.it")) ? !href.contains("html")	: true)
 								&& ((href.contains("www.rainews.it")) ? !href.contains("articoli"): true)
 								&& ((href.contains("www.rainews.it")) ? !href.contains("media"): true)
+								&& ((href.contains("www.ansa.it")) ? false: true) //only one page
+								&& ((href.contains("www.bbc.com")) ? false: true) //only one page
 								&& ((href.contains("www.corriere.it")) ? href.matches(".*index\\.shtml|.*\\/"): true);	
+		//return false; <-- useful to download a single page
 		return shouldVisit;
 	}
 
@@ -63,9 +70,9 @@ public class SpiderCrawler extends WebCrawler {
 	@Override
 	public void visit(Page page) {
 		String url = page.getWebURL().getURL();
-		String domain = page.getWebURL().getDomain();
+		String domain = "" + ((!page.getWebURL().getSubDomain().equals("")) ? page.getWebURL().getSubDomain() + "." : "") + page.getWebURL().getDomain();
 		
-		/* Let's write the visited URL onto tthe DB. */
+		/* Let's write the visited URL onto the DB. */
 		MySQLRepositoryDAO.getInstance().insertURL(connection, url);
 		
 		/* Parse the HTML */
@@ -74,8 +81,8 @@ public class SpiderCrawler extends WebCrawler {
 			HtmlParseData htmlParseData = (HtmlParseData) page.getParseData();
 			
 			/* This is done due to get the XPath of the links in the current page in the next steps. */
-			Document doc = Jsoup.parse(Jsoup.clean(htmlParseData.getHtml(),"http://" + domain, Whitelist.relaxed().preserveRelativeLinks(true)));
-			
+			Document doc = Jsoup.parse(Jsoup.clean(htmlParseData.getHtml(),"http://" + domain, Whitelist.relaxed().preserveRelativeLinks(true).removeTags("script")));
+
 			/* Set up all the compliancy shitties */
 			doc.outputSettings().escapeMode(EscapeMode.xhtml)
 								.syntax(Syntax.xml)
@@ -91,8 +98,13 @@ public class SpiderCrawler extends WebCrawler {
 						 .forEach(webUrl -> {
 							 		/* Retrieving the XPath of the specific outgoing link .*/ 
 									String xpath = null;
-									try {	 
-										xpath = $(document).find(webUrl.getTag()+"[href='"+webUrl.getPath()+"']").xpath();
+									try {	 	
+										String relative = webUrl.getPath();
+										
+										if(domain.contains("web.archive.org"))
+											relative = preprocessURLForWebArchive(relative);
+										
+										xpath = $(document).find(webUrl.getTag()+"[href='" + relative + "']").xpath();
 									} catch (Exception e) {
 										logger.info(e.getMessage() + " for URL: " + webUrl.getURL());
 									}
@@ -107,5 +119,10 @@ public class SpiderCrawler extends WebCrawler {
 						 		});
 			logger.info("Number of outgoing links fetched: " +  outgoingLinks.size());
 		}
+	}
+	
+	
+	private String preprocessURLForWebArchive(String url) {
+		return (url.matches(".+(http:\\/)[a-z].*")) ? url.replaceAll("http:\\/", "http://") : url;
 	}
 }

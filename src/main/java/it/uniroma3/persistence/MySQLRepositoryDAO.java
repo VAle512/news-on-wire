@@ -57,7 +57,7 @@ public class MySQLRepositoryDAO {
 	/**
 	 * The name of the table used to store the Link Occurrences.
 	 */
-	private static final String LINKS_TABLE_NAME = propsReader.getProperty(MYSQL_LINKS_TABLE_NAME);
+	public static final String LINKS_TABLE_NAME = propsReader.getProperty(MYSQL_LINKS_TABLE_NAME);
 	/**
 	 * The name of the table used to store the results of the Stability Analysis.
 	 */
@@ -70,6 +70,11 @@ public class MySQLRepositoryDAO {
 	 * The name of the sequence we want to use.
 	 */
 	private static final String SEQUENCE_ID = propsReader.getProperty(MYSQL_SEQUENCE_ID);
+	
+	/**
+	 * The name of the table used to store the results of the IPS Analysis.
+	 */
+	private static final String IPS_TABLE_NAME = propsReader.getProperty(PropertiesReader.MYSQL_IPS_TABLE_NAME);
     /**
      * The Connection pool.
      */
@@ -231,6 +236,46 @@ public class MySQLRepositoryDAO {
 	}
 	
 	/**
+	 * Creates (and removes, if already existing) a new table used to store results of the Stability Analysis.
+	 */
+	public void createIPSTable() {
+		logger.info("Creating Table [" + IPS_TABLE_NAME + "]...");
+
+		Statement statement = null;
+		Connection connection =  null;
+		try {
+			connection = getConnection();
+			statement = connection.createStatement();
+			
+			/* If the table already exists simply drop it! */
+			String dropTableQuery = "DROP TABLE " + IPS_TABLE_NAME;
+			try {
+				statement.execute(dropTableQuery);
+				logger.info("Old Table dropped [" + IPS_TABLE_NAME + "].");
+			} catch(SQLException e) {}
+			
+			/* ...and then (re)create it. */
+			String createTableQuery = "CREATE TABLE " + IPS_TABLE_NAME + "(url varchar(2083) NOT NULL, "
+																	    + "ips int NOT NULL)";
+			statement.execute(createTableQuery);
+			logger.info("Table created [" + IPS_TABLE_NAME + "].");
+
+		} catch (SQLException e) {
+			logger.error(e.getMessage());
+		}finally {
+			try {
+				/* Releasing resources. */
+				if(statement != null)
+					statement.close();
+				if(connection != null)
+					connection.close();
+			} catch (SQLException e) {
+				logger.error(e.getMessage());
+			}
+		}
+	}
+	
+	/**
 	 * Creates (or resets, if already existing) a new sequence used to track snapshots.
 	 */
 	public void createSequence() {
@@ -353,7 +398,7 @@ public class MySQLRepositoryDAO {
 	 * @param connection is the {@link Connection} to the DB.
 	 * @param url is the result we want to insert.
 	 */
-	public void insertResults(Connection connection, Iterator<Document> docs) {
+	public void insertStabilityResults(Connection connection, Iterator<Document> docs) {
 		PreparedStatement statement = null;
 		try {
 			String  insertResultPrepared = "INSERT INTO " + MySQLRepositoryDAO.STABILITY_TABLE_NAME + "(id, url, stability) VALUES (?,?,?)";
@@ -384,6 +429,40 @@ public class MySQLRepositoryDAO {
 		}
 	}
 	
+	/**
+	 * Inserts a result of the IPS Analysis into the dedicated table.
+	 * @param connection is the {@link Connection} to the DB.
+	 * @param url is the result we want to insert.
+	 */
+	public void insertIPSResults(Connection connection, Iterator<Document> docs) {
+		PreparedStatement statement = null;
+		try {
+			String  insertResultPrepared = "INSERT INTO " + MySQLRepositoryDAO.IPS_TABLE_NAME + "(url, ips) VALUES (?,?)";
+			statement = connection.prepareStatement(insertResultPrepared);
+				
+			final PreparedStatement finalStat = statement;
+			docs.forEachRemaining(doc -> {
+					try {
+						finalStat.setString(1, doc.get("url").toString());
+						finalStat.setInt(2, Integer.parseInt(doc.get("ips").toString()));
+						finalStat.executeUpdate();
+					} catch (SQLException e1) {
+						logger.error(e1.getMessage());
+						try {
+							/* Releasing resources. */
+							if(finalStat != null)
+								finalStat.close();
+							return;
+						}catch(SQLException e2) {
+							logger.error(e2.getMessage());
+						}
+					}
+			});
+		}catch(SQLException e3) {
+			logger.error(e3.getMessage());
+		
+		}
+	}
 	
 	/**
 	 * Inserts a link occurrence into the dedicated table.
@@ -471,6 +550,17 @@ public class MySQLRepositoryDAO {
 		}
 		return snapshot;
 
+	}
+	
+	/**
+	 * Cleans up all the database;
+	 */
+	public void resetAll() {
+		createURLsTable();
+		createLinkOccourrencesTable();
+		createSequence();
+		createStabilityTable();
+		createIPSTable();
 	}
 	
 	/**

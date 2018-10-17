@@ -45,6 +45,7 @@ public class PropertiesReader {
 	public static final String MYSQL_LINKS_TABLE_NAME = "mysql.tables.links";
 	public static final String MYSQL_SEQUENCE_TABLE_NAME = "mysql.tables.sequence";
 	public static final String MYSQL_SEQUENCE_ID = "mysql.tables.sequence.id";
+	public static final String MYSQL_IPS_TABLE_NAME = "mysql.tables.ips";
 	
 	private final Logger logger = Logger.getLogger(this.getClass().getName());
 	private static PropertiesReader instance;

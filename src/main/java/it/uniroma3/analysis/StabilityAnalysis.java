@@ -22,7 +22,8 @@ import scala.Tuple3;
  */
 public class StabilityAnalysis {
 	private static final Logger logger = Logger.getLogger(StabilityAnalysis.class);
-	public static void analyze() {
+	
+	public void analyze() {
 		JavaSparkContext jsc = SparkLoader.getInstance().getContext();
 		@SuppressWarnings("deprecation")
 		SQLContext sqlContext = new SQLContext(jsc);
@@ -59,7 +60,7 @@ public class StabilityAnalysis {
 		   /* Persisting results into the DB. */
 		   .foreachPartition(partitionRdd -> {
 			   					Connection connection = MySQLRepositoryDAO.getConnection();
-			   					MySQLRepositoryDAO.getInstance().insertResults(connection, partitionRdd);
+			   					MySQLRepositoryDAO.getInstance().insertStabilityResults(connection, partitionRdd);
 			
 			   					try {
 			   						connection.close();
@@ -67,6 +68,6 @@ public class StabilityAnalysis {
 			   						logger.error(e.getMessage());
 			   					}
 		   });
-		logger.info("Results have been correclty saved to the DB.");
+		logger.info("Results have been correctly saved to the DB.");
 	}
 }
