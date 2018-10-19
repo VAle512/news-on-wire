@@ -24,6 +24,9 @@ public class IntraPageStaticityAnalysis {
 		@SuppressWarnings("deprecation")
 		SQLContext sqlContext = new SQLContext(jsc);
 		
+		/* Erase previous IPS Data */
+		MySQLRepositoryDAO.getInstance().createIPSTable();
+		
 		JavaRDD<Document> rdd =  sqlContext.read()
 									  	   .format("jdbc")
 									  	   .option("url", MySQLRepositoryDAO.DB_URL)
@@ -60,16 +63,16 @@ public class IntraPageStaticityAnalysis {
 										   	   		      /* ... but we want to compare XPaths across adjacent only snapshots.
 										   	   		       * e.g. (s1,s2), (s2,s3)... 
 										   	   		       */
-										   	   		      .filter(x -> x._1._2._2 > x._2._2._2)
+										   	   		      .filter(x ->  x._2._2._2 == x._1._2._2 + 1)
 										   	   		      /* Now we set 1 if the XPath across two snapshots has changed, 0 otherwise. */
 										   	   		      .mapToInt(tuple -> !tuple._1._2._1.equals(tuple._2._2._1) ? 1 : 0)
 										   	   		      .sum();	   	   
 								   return new Tuple2<>(group._1, count);
 									   })
-		   .map(tuple -> new Tuple2<>(tuple._1._1, tuple._2))
+		   .map(tuple -> new Tuple2<>(tuple._1, tuple._2))
 		   .groupBy(tuple -> tuple._1)
 		   .map(group -> new Tuple2<>(group._1, Iterables.asList(group._2).stream().mapToInt(x-> x._2).sum()))
-		   .map(tuple -> new Document().append("url", tuple._1).append("ips", tuple._2));
+		   .map(tuple -> new Document().append("url", tuple._1._1).append("ips", tuple._2.intValue()).append("referringPage", tuple._1._2));
 		
 		result.foreachPartition(partitionRdd -> {
 				Connection connection = MySQLRepositoryDAO.getConnection();

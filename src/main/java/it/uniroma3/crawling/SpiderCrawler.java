@@ -34,8 +34,7 @@ public class SpiderCrawler extends WebCrawler {
 	private static final Logger logger = Logger.getLogger(SpiderCrawler.class);
 	private static final PropertiesReader propsReader = PropertiesReader.getInstance();
 	private final static Pattern FILTERS = Pattern.compile(".*(\\.(" + propsReader.getProperty(CRAWLER_EXCLUDE_LIST).replaceAll(",", "|") + "))$");
-	private final static Pattern WEB_ARCHIVE_ABS_PATTERN = Pattern.compile("^(http(s)?:\\/\\/.*)(http(s)?.*)");
-	private final static Pattern WEB_ARCHIVE_REL_PATTERN = Pattern.compile("^(\\/web\\/\\d+\\/)(http(s)?.*)");
+	private final static Pattern WEB_ARCHIVE_PATTERN = Pattern.compile("^(https?:\\/\\/.*)\\/(https?\\/\\/?www.*)(.*)^|\\/web\\/\\d+\\*?\\/(https?:\\/\\/?)?(.*)");
 	private static Connection connection = MySQLRepositoryDAO.getConnection();
 	
 	/* (non-Javadoc)
@@ -56,7 +55,7 @@ public class SpiderCrawler extends WebCrawler {
 								&& ((href.contains("www.foggiatoday.it")) ? !href.contains("html")	: true)
 								&& ((href.contains("www.rainews.it")) ? !href.contains("articoli"): true)
 								&& ((href.contains("www.rainews.it")) ? !href.contains("media"): true)
-								&& ((href.contains("www.ansa.it")) ? false: true) //only one page
+								//&& ((href.contains("www.ansa.it")) ? false: true) //only one page
 								&& ((href.contains("www.bbc.com")) ? false: true) //only one page
 								&& ((href.contains("www.corriere.it")) ? href.matches(".*index\\.shtml|.*\\/"): true);	
 		//return false; <-- useful to download a single page
@@ -68,8 +67,11 @@ public class SpiderCrawler extends WebCrawler {
 	 */
 	@Override
 	public void visit(Page page) {
-		String url = page.getWebURL().getURL();
 		String domain = "" + ((!page.getWebURL().getSubDomain().equals("")) ? page.getWebURL().getSubDomain() + "." : "") + page.getWebURL().getDomain();
+		String url = page.getWebURL().getURL();
+		
+		if(domain.contains("web.archive.org"))
+			url = unifySpace(url);
 		
 		/* Let's write the visited URL onto the DB. */
 		MySQLRepositoryDAO.getInstance().insertURL(connection, url);
@@ -125,15 +127,13 @@ public class SpiderCrawler extends WebCrawler {
 		return (url.matches(".+(http:\\/)[a-z].*")) ? url.replaceAll("http:\\/", "http://") : url;
 	}
 	
+	//TODO: Da rivedere ma per ora funziona
 	private static String unifySpace(String url) {
 		Matcher matcher = null;
-		if(url.startsWith("http")) //Not relative		
-			matcher = WEB_ARCHIVE_ABS_PATTERN.matcher(url);
-		else //Relative
-			matcher = WEB_ARCHIVE_REL_PATTERN.matcher(url); 
+		matcher = WEB_ARCHIVE_PATTERN.matcher(url);
 		
 		if(matcher.find())
-			return matcher.group(2);
+			return matcher.group(5);			
 		else
 			return url;
 	}

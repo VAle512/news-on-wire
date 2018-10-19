@@ -23,7 +23,7 @@ import scala.Tuple3;
 public class StabilityAnalysis {
 	private static final Logger logger = Logger.getLogger(StabilityAnalysis.class);
 	
-	public void analyze() {
+	public static JavaRDD<Document> analyze() {
 		JavaSparkContext jsc = SparkLoader.getInstance().getContext();
 		@SuppressWarnings("deprecation")
 		SQLContext sqlContext = new SQLContext(jsc);
@@ -49,25 +49,28 @@ public class StabilityAnalysis {
 		int latestSnapshot = MySQLRepositoryDAO.getInstance().getCurrentSequence();
 		
 		
-		rdd.map(doc -> new Tuple3<>(Integer.parseInt(doc.get("id").toString()), 
+		JavaRDD<Document> result = rdd.map(doc -> new Tuple3<>(Integer.parseInt(doc.get("id").toString()), 
 																				doc.get("url").toString(), 
 																				Integer.parseInt(doc.get("snapshot").toString())))
-		   .groupBy(tuple -> tuple._2())
-		   .map(group -> new Tuple3<>(Iterables.asList(group._2).get(0)._1().intValue(), 
-									  group._1 , 
-									  (double) Iterables.asList(group._2).size() / (double) latestSnapshot))
-		   .map(tuple -> new Document().append("id", tuple._1()).append("url",tuple._2()).append("stability", tuple._3()))
-		   /* Persisting results into the DB. */
-		   .foreachPartition(partitionRdd -> {
-			   					Connection connection = MySQLRepositoryDAO.getConnection();
-			   					MySQLRepositoryDAO.getInstance().insertStabilityResults(connection, partitionRdd);
-			
-			   					try {
-			   						connection.close();
-			   					} catch (SQLException e) {
-			   						logger.error(e.getMessage());
-			   					}
-		   });
+									  .groupBy(tuple -> tuple._2())
+									  .map(group -> new Tuple3<>(Iterables.asList(group._2).get(0)._1().intValue(), 
+											  									  group._1 , 
+											  									  (double) Iterables.asList(group._2).size() / (double) latestSnapshot))
+									  .map(tuple -> new Document().append("id", tuple._1()).append("url",tuple._2()).append("stability", tuple._3()));
+		
+	   /* Persisting results into the DB. */
+	   result.foreachPartition(partitionRdd -> {
+		   					Connection connection = MySQLRepositoryDAO.getConnection();
+		   					MySQLRepositoryDAO.getInstance().insertStabilityResults(connection, partitionRdd);
+		
+		   					try {
+		   						connection.close();
+		   					} catch (SQLException e) {
+		   						logger.error(e.getMessage());
+		   					}
+	   });
 		logger.info("Results have been correctly saved to the DB.");
+		
+		return result;
 	}
 }

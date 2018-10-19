@@ -10,6 +10,9 @@ import static it.uniroma3.properties.PropertiesReader.MYSQL_STABILITY_TABLE_NAME
 import static it.uniroma3.properties.PropertiesReader.MYSQL_URLS_TABLE_NAME;
 import static it.uniroma3.properties.PropertiesReader.MYSQL_USER;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -21,6 +24,8 @@ import java.util.Iterator;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.log4j.Logger;
 import org.bson.Document;
+
+import com.google.common.io.Files;
 
 import it.uniroma3.properties.PropertiesReader;
 
@@ -365,8 +370,10 @@ public class MySQLRepositoryDAO {
 			result = statement.executeQuery(checkExistenceSameSnapshotQuery);
 
 			/* This way we can release resources. */
-			if(result.next())
-				throw new SQLException("URL already present");
+			if(result.next()) {
+				throw new SQLException("URL already present: " + url);
+			}
+				
 
 			Timestamp currentTimestamp = new Timestamp((new java.util.Date()).getTime());
 			String insertURLQuery = "INSERT INTO " + URLS_TABLE_NAME + "(url, snapshot, date) values(?,?,?)";	    
@@ -377,7 +384,8 @@ public class MySQLRepositoryDAO {
 			pstat.executeUpdate();
 			
 		} catch (SQLException e) {
-			logger.error(e.getMessage());
+			/* Reduced logging. */
+			//logger.error(e.getMessage());
 		}finally {
 			try {
 				/* Releasing resources. */
@@ -444,7 +452,7 @@ public class MySQLRepositoryDAO {
 			docs.forEachRemaining(doc -> {
 					try {
 						finalStat.setString(1, doc.get("url").toString());
-						finalStat.setInt(2, Integer.parseInt(doc.get("ips").toString()));
+						finalStat.setInt(2, doc.getInteger("ips"));
 						finalStat.executeUpdate();
 					} catch (SQLException e1) {
 						logger.error(e1.getMessage());
@@ -561,6 +569,38 @@ public class MySQLRepositoryDAO {
 		createSequence();
 		createStabilityTable();
 		createIPSTable();
+	}
+	
+	/*
+	 * PATTERN! PATTERN! PATTERN!
+	 */
+	public void printURLsOnFile(File file) {
+		Statement statement = null;
+		ResultSet result = null;
+		Connection connection = null;
+		try {
+			String selectURLSQuery = "SELECT url FROM " + MySQLRepositoryDAO.URLS_TABLE_NAME + " where url LIKE '%.shtml' OR url LIKE '%index%' OR url LIKE '%/'";
+			connection = getConnection();
+			statement = connection.createStatement();
+				
+			result = statement.executeQuery(selectURLSQuery);
+			Files.write("", file, StandardCharsets.UTF_8);
+			
+			while(result.next())
+				Files.append(result.getString(1) + "\n", file, StandardCharsets.UTF_8);
+			
+		} catch (SQLException | IOException e) {
+			try {
+				if(statement != null)
+					statement.close();
+				if(result != null)
+					result.close();
+				if(connection != null)
+					connection.close();
+			} catch (SQLException e1) {
+				logger.error(e1.getMessage());
+			}
+		}
 	}
 	
 	/**
