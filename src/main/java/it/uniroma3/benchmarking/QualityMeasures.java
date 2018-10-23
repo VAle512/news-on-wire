@@ -1,6 +1,11 @@
 package it.uniroma3.benchmarking;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+
+import com.google.common.io.Files;
 
 /**
  * This class does quality measures calculations such as Precision and Recall.
@@ -24,10 +29,27 @@ public class QualityMeasures {
 	 */
 	public Double calculateRecall(List<String> data) {
 		long relevantFound = 0;
-
-		for(Object row: data)
-			if(goldenData.contains(row))
+		
+		File f = new File("/home/luigi/Desktop/recall");
+		try {
+			Files.write("", f , StandardCharsets.UTF_8);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		for(Object row: goldenData)
+			if(data.contains(row))
 				++relevantFound;
+			else {
+				try {
+					Files.append(row.toString() + "\n", f, StandardCharsets.UTF_8);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		
 		return (double)relevantFound/(double)goldenData.size();
 	}
 	
@@ -38,9 +60,10 @@ public class QualityMeasures {
 	public Double calculatePrecision(List<String> data) {
 		long relevantFound = 0;
 		
-		for(Object row: data)
-			if(goldenData.contains(row))
+		for(Object row: goldenData)
+			if(data.contains(row))
 				++relevantFound;
+		
 		return (double)relevantFound/(double)data.size();
 	}
 }

@@ -55,7 +55,7 @@ public class SpiderCrawler extends WebCrawler {
 								&& ((href.contains("www.foggiatoday.it")) ? !href.contains("html")	: true)
 								&& ((href.contains("www.rainews.it")) ? !href.contains("articoli"): true)
 								&& ((href.contains("www.rainews.it")) ? !href.contains("media"): true)
-								//&& ((href.contains("www.ansa.it")) ? false: true) //only one page
+								//&& ((href.contains("www.ansa.it/games/")) ? false: true) //only one page
 								&& ((href.contains("www.bbc.com")) ? false: true) //only one page
 								&& ((href.contains("www.corriere.it")) ? href.matches(".*index\\.shtml|.*\\/"): true);	
 		//return false; <-- useful to download a single page
@@ -91,7 +91,6 @@ public class SpiderCrawler extends WebCrawler {
 			
 			/* Convert the previous document into a format parsable by the jOOX library. */
 			org.w3c.dom.Document document = $(doc.html()).document();
-			
 			Set<WebURL> outgoingLinks = htmlParseData.getOutgoingUrls();
 			
 			outgoingLinks.stream()
@@ -107,6 +106,11 @@ public class SpiderCrawler extends WebCrawler {
 											relative = preprocessURLForWebArchive(relative);
 										
 										xpath = $(document).find(webUrl.getTag()+"[href='" + relative + "']").xpath();
+										
+										/* If null try with the absolute path */
+										if(xpath == null)
+											xpath = $(document).find(webUrl.getTag()+"[href='" + webUrl.getURL() + "']").xpath();
+									
 									} catch (Exception e) {
 										logger.info(e.getMessage() + " for URL: " + webUrl.getURL());
 									}

@@ -202,7 +202,7 @@ public class MySQLRepositoryDAO {
 	/**
 	 * Creates (and removes, if already existing) a new table used to store results of the Stability Analysis.
 	 */
-	public void createStabilityTable() {
+	public void createAbsoluteTransiencyTable() {
 		logger.info("Creating Table [" + STABILITY_TABLE_NAME + "]...");
 
 		Statement statement = null;
@@ -243,7 +243,7 @@ public class MySQLRepositoryDAO {
 	/**
 	 * Creates (and removes, if already existing) a new table used to store results of the Stability Analysis.
 	 */
-	public void createIPSTable() {
+	public void createLinkMotionTable() {
 		logger.info("Creating Table [" + IPS_TABLE_NAME + "]...");
 
 		Statement statement = null;
@@ -261,9 +261,49 @@ public class MySQLRepositoryDAO {
 			
 			/* ...and then (re)create it. */
 			String createTableQuery = "CREATE TABLE " + IPS_TABLE_NAME + "(url varchar(2083) NOT NULL, "
-																	    + "ips int NOT NULL)";
+																	    + "score int NOT NULL)";
 			statement.execute(createTableQuery);
 			logger.info("Table created [" + IPS_TABLE_NAME + "].");
+
+		} catch (SQLException e) {
+			logger.error(e.getMessage());
+		}finally {
+			try {
+				/* Releasing resources. */
+				if(statement != null)
+					statement.close();
+				if(connection != null)
+					connection.close();
+			} catch (SQLException e) {
+				logger.error(e.getMessage());
+			}
+		}
+	}
+	
+	/**
+	 * Creates (and removes, if already existing) a new table used to store results of the Combined Analysis.
+	 */
+	public void createCombinedTable() {
+		logger.info("Creating Table [" + "Combined" + "]...");
+
+		Statement statement = null;
+		Connection connection =  null;
+		try {
+			connection = getConnection();
+			statement = connection.createStatement();
+			
+			/* If the table already exists simply drop it! */
+			String dropTableQuery = "DROP TABLE " + "Combined";
+			try {
+				statement.execute(dropTableQuery);
+				logger.info("Old Table dropped [" + "Combined" + "].");
+			} catch(SQLException e) {}
+			
+			/* ...and then (re)create it. */
+			String createTableQuery = "CREATE TABLE " + "Combined" + "(url varchar(2083) NOT NULL, "
+																	    + "score double NOT NULL)";
+			statement.execute(createTableQuery);
+			logger.info("Table created [" + "Combined" + "].");
 
 		} catch (SQLException e) {
 			logger.error(e.getMessage());
@@ -417,7 +457,7 @@ public class MySQLRepositoryDAO {
 					try {
 						finalStat.setInt(1, Integer.parseInt(doc.get("id").toString()));
 						finalStat.setString(2, doc.get("url").toString());
-						finalStat.setDouble(3, Double.parseDouble(doc.get("stability").toString()));
+						finalStat.setDouble(3, Double.parseDouble(doc.get("score").toString()));
 						finalStat.executeUpdate();
 					} catch (SQLException e1) {
 						logger.error(e1.getMessage());
@@ -442,17 +482,52 @@ public class MySQLRepositoryDAO {
 	 * @param connection is the {@link Connection} to the DB.
 	 * @param url is the result we want to insert.
 	 */
-	public void insertIPSResults(Connection connection, Iterator<Document> docs) {
+	public void insertLinkMotionResults(Connection connection, Iterator<Document> docs) {
 		PreparedStatement statement = null;
 		try {
-			String  insertResultPrepared = "INSERT INTO " + MySQLRepositoryDAO.IPS_TABLE_NAME + "(url, ips) VALUES (?,?)";
+			String  insertResultPrepared = "INSERT INTO " + MySQLRepositoryDAO.IPS_TABLE_NAME + "(url, score) VALUES (?,?)";
 			statement = connection.prepareStatement(insertResultPrepared);
 				
 			final PreparedStatement finalStat = statement;
 			docs.forEachRemaining(doc -> {
 					try {
 						finalStat.setString(1, doc.get("url").toString());
-						finalStat.setInt(2, doc.getInteger("ips"));
+						finalStat.setInt(2, doc.getInteger("score"));
+						finalStat.executeUpdate();
+					} catch (SQLException e1) {
+						logger.error(e1.getMessage());
+						try {
+							/* Releasing resources. */
+							if(finalStat != null)
+								finalStat.close();
+							return;
+						}catch(SQLException e2) {
+							logger.error(e2.getMessage());
+						}
+					}
+			});
+		}catch(SQLException e3) {
+			logger.error(e3.getMessage());
+		
+		}
+	}
+	
+	/**
+	 * Inserts a result of the Combined Analysis into the dedicated table.
+	 * @param connection is the {@link Connection} to the DB.
+	 * @param url is the result we want to insert.
+	 */
+	public void insertCombinedResults(Connection connection, Iterator<Document> docs) {
+		PreparedStatement statement = null;
+		try {
+			String  insertResultPrepared = "INSERT INTO " + "Combined" + "(url, score) VALUES (?,?)";
+			statement = connection.prepareStatement(insertResultPrepared);
+				
+			final PreparedStatement finalStat = statement;
+			docs.forEachRemaining(doc -> {
+					try {
+						finalStat.setString(1, doc.get("url").toString());
+						finalStat.setDouble(2, doc.getDouble("score"));
 						finalStat.executeUpdate();
 					} catch (SQLException e1) {
 						logger.error(e1.getMessage());
@@ -485,10 +560,15 @@ public class MySQLRepositoryDAO {
 									  String referringPage, 
 									  String relative, 
 									  String xpath) {
+		
 		Statement statement = null;
 		ResultSet result = null;
 		PreparedStatement pstat = null;
 		try {
+			
+			if(link.equals(referringPage))
+				throw new SQLException("Found self reference.");
+
 			/* Retrieve the current snapshot counter. */
 			int snapshot = this.getCurrentSequence();
 			
@@ -504,7 +584,8 @@ public class MySQLRepositoryDAO {
 		    pstat.executeUpdate();
 			   
 		} catch (SQLException e) {
-			logger.error(e.getMessage());
+			/* Reduce logging. */
+			//logger.error(e.getMessage());
 		}finally {
 			try {
 				/* Releasing resources. */
@@ -567,8 +648,8 @@ public class MySQLRepositoryDAO {
 		createURLsTable();
 		createLinkOccourrencesTable();
 		createSequence();
-		createStabilityTable();
-		createIPSTable();
+		createAbsoluteTransiencyTable();
+		createLinkMotionTable();
 	}
 	
 	/*
