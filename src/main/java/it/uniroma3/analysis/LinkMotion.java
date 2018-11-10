@@ -4,14 +4,20 @@ import static it.uniroma3.persistence.MySQLRepositoryDAO.LINKS_TABLE_NAME;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.spark.api.java.JavaRDD;
 import org.bson.Document;
 import org.neo4j.driver.internal.util.Iterables;
-import org.spark_project.guava.collect.Sets;
+
+import com.google.common.collect.Sets;
 
 import it.uniroma3.persistence.MySQLRepositoryDAO;
 import scala.Tuple2;
+import scala.Tuple3;
 
 /**
  * This class is intended to quantify the motion of a link 
@@ -46,42 +52,57 @@ public class LinkMotion extends Analysis{
 										                    	 .append("referringPage", row.getString(2))
 										                    	 .append("relativeLink", row.getString(3))
 								  	   							 .append("xpath", row.getString(4))
-								  	   							 .append("snapshot", row.getInt(5))
-								  	   							 .append("date", row.getTimestamp(6)));
+								  	   							 .append("collection", row.getString(5))
+								  	   							 .append("snapshot", row.getInt(6))
+								  	   							 .append("date", row.getTimestamp(7)));
+		
+		/* Retrieve the current snapshot counter */
+		int latestSnapshot = MySQLRepositoryDAO.getInstance().getCurrentSequence();
 		
 		/* 
 		 * Here we group by (link, referring page) to isolate link occurrences 
 		 * of the same page but picked in different snapshots.
 		 */
-		JavaRDD<Document> result = rdd.mapToPair(row -> new Tuple2<>(new Tuple2<>(row.get("link").toString(), row.get("referringPage").toString()), new Tuple2<>((row.get("xpath")==null) ? null : row.get("xpath").toString(),Integer.parseInt(row.get("snapshot").toString()))))
+		JavaRDD<Document> collectionMovement = rdd.mapToPair(row -> new Tuple2<>(new Tuple3<>(row.get("link").toString(), 
+																				  row.get("referringPage").toString(), 
+																				 (row.get("collection")==null || row.getString("collection").equals("")) ? null : row.get("collection").toString()),
+																	 new Tuple2<>((row.get("xpath")==null) ? null : row.get("xpath").toString(),
+																				  Integer.parseInt(row.get("snapshot").toString()))))
 									  /* Some XPath could be null, better to remove them. */
-									  .filter(row -> row._2._1!=null)
+									  .filter(row -> row._1._3()!=null && row._2._1()!=null)
 									  .groupBy(pair -> pair._1)   
-									  .map(group -> {   
-										  /* Let's count how many "XPath's changes" there are for a link in the same page. */
-										  int count = Sets.cartesianProduct(Sets.newHashSet(group._2), Sets.newHashSet(group._2))
-										   	   		      .stream()
-										   	   		      /* Here we have all the possible couples of link occurrences... */
-										   	   		      .map(x -> new Tuple2<>(x.get(0), x.get(1)))
-										   	   		      /* ... but we want to compare XPaths across adjacent only snapshots.
-										   	   		       * e.g. (s1,s2), (s2,s3)... 
-										   	   		       */
-										   	   		      .filter(x ->  x._2._2._2 == x._1._2._2 + 1)
-										   	   		      /* Now we set 1 if the XPath across two snapshots has changed, 0 otherwise. */
-										   	   		      .mapToInt(tuple -> !tuple._1._2._1.equals(tuple._2._2._1) ? 1 : 0)
-										   	   		      .sum();	   	   
-								   return new Tuple2<>(group._1, count);
+									  .map(group -> { 
+										  /* Let's count how many "XPath's changes" there are for a link across snaphshot. */
+										  Set<Tuple2<String, Integer>> xpath2snapshot = Iterables.asList(group._2).stream().map(x -> x._2).collect(Collectors.toSet());			  
+										  Set<List<Tuple2<String, Integer>>> couples = 	Sets.cartesianProduct(xpath2snapshot, xpath2snapshot);	
+										  
+										  List<Tuple2<Integer, Integer>> erroneus = couples.stream().map(x -> new Tuple2<>(x.get(0), x.get(1)))
+										  				             .filter(tuple -> tuple._1._2 < tuple._2._2)
+										                             .filter(tuple -> tuple._1._1.equals(tuple._2._1))
+										                             .map(tuple -> new Tuple2<>(tuple._1._2, tuple._2._2))
+										                             .collect(Collectors.toList());
+										  
+										  int count = couples
+										      .stream()
+										      .map(x -> new Tuple2<>(x.get(0), x.get(1)))
+										      .filter(tuple -> (tuple._1._2 < tuple._2._2)&&(!erroneus.contains(new Tuple2<>(tuple._1._2, tuple._2._2))))
+										      .mapToInt(x -> {
+										    	  int val = (!x._1._1.equals(x._2._1)) ? 1 : 0;
+										    	  return val;
+										      })
+										      .sum();
+	
+										  return new Tuple2<>(group._1, count);
 									   })
-		   .map(tuple -> new Tuple2<>(tuple._1, tuple._2))
-		   .groupBy(tuple -> tuple._1)
-		   .map(group -> new Tuple2<>(group._1, Iterables.asList(group._2).stream().mapToInt(x-> x._2).sum()))
-		   .map(tuple -> new Document().append("url", tuple._1._1).append("score", tuple._2.intValue()).append("referringPage", tuple._1._2));
-		
+									  .groupBy(x -> x._1._1())
+									  .map(x -> new Tuple2<>(x._1,Iterables.asList(x._2).stream().mapToInt(y -> y._2).sum()))
+		   .map(tuple -> new Document().append("url", tuple._1).append("score", tuple._2.intValue()).append("referringPage", "nil"));
+		collectionMovement.filter(x -> x.getInteger("score") != 0).take(30).forEach(System.out::println);
 		/* Persist results on the DB. 
 		 * WARNING: referringPage not persisted but could be useful! 
 		 */
 		if(persist) {
-			result.mapToPair(doc -> new Tuple2<>(doc.getString("url"), doc.getInteger("score")))
+			collectionMovement.mapToPair(doc -> new Tuple2<>(doc.getString("url"), doc.getInteger("score")))
 			 	  .reduceByKey((a, b) -> a + b)
 			 	  .map(tuple -> new Document().append("url", tuple._1).append("score", tuple._2))
 			 	  .foreachPartition(partitionRdd -> {
@@ -98,6 +119,6 @@ public class LinkMotion extends Analysis{
 			logger.info("Results have been correctly saved to the DB.");
 		}
 		
-		return result;
+		return collectionMovement;
 	}
 }

@@ -34,6 +34,7 @@ public class PropertiesReader {
 	public static final String CRAWLER_DOMAIN = "crawler.domain";
 	public static final String CRAWLER_WRITE_ON_FILE = "crawler.writeonFile";
 	public static final String CRAWLER_FILE_TO_WRITE_ON = "crawler.writeon";
+	public static final String CRAWLER_SOCIAL_EXCLUDE_LIST = "crawler.social.excludeList";
 	
 	/* MYSQL */
 	public static final String MYSQL_JDBC_DRIVER = "mysql.jdbc.driver";  

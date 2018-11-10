@@ -6,12 +6,14 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import org.apache.log4j.Logger;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.bson.Document;
 
 import it.uniroma3.analysis.Combined;
 import it.uniroma3.analysis.LinkAbsoluteTransiency;
 import it.uniroma3.analysis.LinkMotion;
+import it.uniroma3.utils.FindBestThreshold;
 import scala.Tuple2;
 
 /**
@@ -23,11 +25,11 @@ public class PrecisionRecallBenchmarking {
 	private static final Logger logger = Logger.getLogger(PrecisionRecallBenchmarking.class);
 	private static QualityMeasures measures;
 
-	public static void execute() throws IOException {
-		measures = new QualityMeasures(Files.readAllLines(Paths.get("/home/luigi/Desktop/golden")));
+	public static void execute() throws IOException, InstantiationException, IllegalAccessException {
+		measures = new QualityMeasures(Files.readAllLines(Paths.get("/home/luigi/ansa_golden2.out")));
 		//printStabilityStatistics(0.8);
 		//printIntraPageStaticityStatistics(1);
-		printCombined(0.1);
+		printCombined(0.4);
 	}
 	
 	private static void printStabilityStatistics(double threshold) {
@@ -54,15 +56,11 @@ public class PrecisionRecallBenchmarking {
 		logger.info("IPS RECALL: " + measures.calculateRecall(ipsData));
 	}
 	
-	private static void printCombined(double threshold) {
-		List<String> combinedData = (new Combined()).analyze(true)
-				   									.mapToPair(doc -> new Tuple2<>(doc.getString("url"), doc.getDouble("score")))
-													.filter(tuple -> tuple._2 < threshold)
-													.map(x -> x._1)
-													.distinct()
-													.collect();
-		
-		logger.info("Combined PRECISION: " + measures.calculatePrecision(combinedData));
-		logger.info("Combined RECALL: " + measures.calculateRecall(combinedData));
+	private static void printCombined(double threshold) throws InstantiationException, IllegalAccessException {
+//		Combined c = new Combined();
+//		JavaPairRDD<String, Double> scores = c.loadData("Combined").mapToPair(doc -> new Tuple2<>(doc.getString(0), doc.getDouble(1)));
+		JavaPairRDD<String, Double> scores = Combined.class.newInstance().analyze(true).mapToPair(doc -> new Tuple2<>(doc.getString("url"), doc.getDouble("score")));
+
+		FindBestThreshold.find(scores, threshold, measures);
 	}
 }

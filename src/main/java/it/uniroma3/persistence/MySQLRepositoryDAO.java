@@ -20,6 +20,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.Iterator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.log4j.Logger;
@@ -38,6 +40,7 @@ import it.uniroma3.properties.PropertiesReader;
 public class MySQLRepositoryDAO {
 	private static final Logger logger = Logger.getLogger(MySQLRepositoryDAO.class);
 	private static final PropertiesReader propsReader = PropertiesReader.getInstance();
+	private static final Pattern collectionPattern = Pattern.compile("^((?:\\/[a-z 1-9]+\\[\\d+\\])+(?:(?:\\/(?:ul|ol|table)\\[\\d+\\])))(?:\\/[a-z 1-9]+\\[\\d+\\]){1,3}(\\/a\\[\\d+\\])$|^((?:\\/[a-z 1-9]+\\[\\d+\\])+(?:(?:\\/(?:div)\\[\\d+\\])))(?:\\/[a-z 1-9]+\\[\\d+\\]){1,2}(\\/a\\[\\d+\\])$");
 	
 	/**
 	 * The JDBC driver identifier.
@@ -177,6 +180,7 @@ public class MySQLRepositoryDAO {
 																   + "referringPage varchar(2083) NOT NULL, "
 																   + "relativeLink varchar(2083), "
 																   + "xpath varchar(2083), "
+																   + "collection varchar(2083), "
 																   + "snapshot int NOT NULL, "
 																   + "date Timestamp, "
 																   + "PRIMARY KEY(id))";
@@ -572,15 +576,38 @@ public class MySQLRepositoryDAO {
 			/* Retrieve the current snapshot counter. */
 			int snapshot = this.getCurrentSequence();
 			
+			String linkCollection="";
+			if(xpath != null) {
+				Matcher matcher = collectionPattern.matcher(xpath);
+				if(matcher.find())
+					if(matcher.group(1)!=null)
+						linkCollection=matcher.group(1) + "/*";
+					else
+						linkCollection=matcher.group(2) + "/*";
+			}
+			
+			boolean alreadyThere = connection.createStatement().executeQuery("SELECT * FROM " + LINKS_TABLE_NAME 
+													+ " WHERE link='" + link +"' "
+													+ "AND referringPage='" + referringPage + "' "
+													+ "AND xpath='" + xpath + "' "
+													+ "AND snapshot=" + snapshot +" "
+													+ "AND collection='" + linkCollection +"'").next();
+			
+			//e xpath è nullo ci faccio molto poco
+			if(alreadyThere  || xpath==null) 
+				throw new SQLException("Already There.");	
+			
+			
 		    Timestamp sqlDate = new Timestamp(new java.util.Date().getTime());
-		    String insertLinkOccurrenceQuery = "INSERT INTO " + LINKS_TABLE_NAME + "(link, referringPage, relativeLink, xpath, snapshot, date) values(?,?,?,?,?,?)";	    
+		    String insertLinkOccurrenceQuery = "INSERT INTO " + LINKS_TABLE_NAME + "(link, referringPage, relativeLink, xpath, collection, snapshot, date) values(?,?,?,?,?,?,?)";	    
 		    pstat = connection.prepareStatement(insertLinkOccurrenceQuery);
 		    pstat.setString(1, link);
 		    pstat.setString(2, referringPage);
 		    pstat.setString(3, relative);
 		    pstat.setString(4, xpath);
-		    pstat.setInt(5, snapshot);
-		    pstat.setTimestamp(6, sqlDate);  
+		    pstat.setString(5, linkCollection);
+		    pstat.setInt(6, snapshot);
+		    pstat.setTimestamp(7, sqlDate);  
 		    pstat.executeUpdate();
 			   
 		} catch (SQLException e) {
@@ -682,6 +709,32 @@ public class MySQLRepositoryDAO {
 				logger.error(e1.getMessage());
 			}
 		}
+	}
+	
+	public void updateCollections() throws SQLException {
+		Connection connection = getConnection();
+		ResultSet results = getConnection().createStatement().executeQuery("SELECT * FROM " + LINKS_TABLE_NAME);
+		while(results.next()) {
+			int id = results.getInt(1);
+			String xpath = results.getString(5);
+			
+			String collection = "";
+			Matcher matcher = collectionPattern.matcher(xpath);
+			
+			if(matcher.find()) {
+				if(matcher.group(3)!=null)
+					collection = matcher.group(3) + "/*";
+				if(matcher.group(2)!=null)
+					collection = matcher.group(2) + "/*";
+				if(matcher.group(1)!=null)
+					collection = matcher.group(1) + "/*";			
+			}
+			String query = "UPDATE "+ LINKS_TABLE_NAME + " SET collection='" + collection + "' WHERE id=" + id;
+			connection.createStatement().executeUpdate(query);
+		}
+		
+		results.close();
+		connection.close();
 	}
 	
 	/**

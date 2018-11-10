@@ -21,6 +21,7 @@ public class QualityMeasures {
 	 */
 	public QualityMeasures(List<String> data) {
 		goldenData = data;
+		System.out.println(goldenData.size());
 	}
 	
 	/**
@@ -60,10 +61,26 @@ public class QualityMeasures {
 	public Double calculatePrecision(List<String> data) {
 		long relevantFound = 0;
 		
+		File f = new File("/home/luigi/Desktop/precision");
+		try {
+			Files.write("", f , StandardCharsets.UTF_8);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		
 		for(Object row: goldenData)
 			if(data.contains(row))
 				++relevantFound;
-		
+			else {
+				try {
+					Files.append(row.toString() + "\n", f, StandardCharsets.UTF_8);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
 		return (double)relevantFound/(double)data.size();
 	}
 }

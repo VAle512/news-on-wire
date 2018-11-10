@@ -7,13 +7,18 @@ import static it.uniroma3.properties.PropertiesReader.CRAWLER_STORAGE;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.spark_project.guava.io.Files;
 
+import com.sleepycat.je.Environment;
+import com.sleepycat.je.EnvironmentConfig;
+
 import edu.uci.ics.crawler4j.crawler.CrawlConfig;
 import edu.uci.ics.crawler4j.crawler.CrawlController;
 import edu.uci.ics.crawler4j.fetcher.PageFetcher;
+import edu.uci.ics.crawler4j.frontier.DocIDServer;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtConfig;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
 import edu.uci.ics.crawler4j.url.WebURL;
@@ -43,10 +48,11 @@ public class CrawlingDriver {
 		CrawlConfig config = new CrawlConfig();
 		config.setCrawlStorageFolder(STORAGE);
 		config.setMaxDepthOfCrawling(MAX_DEPTH);
-
+		logger.info("Selected depth: " + MAX_DEPTH);
 		/*
 		 * Instantiate the controller for this crawl.
 		 */
+		
 		PageFetcher pageFetcher = new PageFetcher(config);
 		RobotstxtConfig robotstxtConfig = new RobotstxtConfig();
 		robotstxtConfig.setEnabled(false);
