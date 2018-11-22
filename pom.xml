@@ -3,16 +3,65 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>it.uniroma3</groupId>
-    <artifactId>url-classification-streaming</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <packaging>jar</packaging>
-
-    <name>url-classification-streaming</name>
+    <artifactId>pages-classification</artifactId>
+    <version>alpha-0.1</version>
+    <packaging>jar</packaging>    
+	<build>
+		<resources>
+    		<resource>
+     			<directory>src/main/resources</directory>
+    		</resource>
+   		</resources>
+   		
+   		<plugins>
+    		<plugin>
+      			<!-- Build an executable JAR -->
+      			<groupId>org.apache.maven.plugins</groupId>
+      			<artifactId>maven-jar-plugin</artifactId>
+      			<version>3.1.0</version>
+      			<configuration>
+        			<archive>
+          				<manifest>
+          					<addClasspath>true</addClasspath>
+                        	<classpathPrefix>${project.build.directory}/dependency</classpathPrefix>
+            				<mainClass>it.uniroma3.newswire.init.ProgramDriver</mainClass>
+          				</manifest>
+        			</archive>
+      			</configuration>
+    		</plugin>
+    		
+    		<plugin>
+    			<groupId>org.apache.maven.plugins</groupId>
+    			<artifactId>maven-dependency-plugin</artifactId>
+    			<version>3.0.0</version>
+    			<executions>
+      				<execution>
+        				<id>copy-dependencies</id>
+        				<phase>package</phase>
+        				<goals>
+          					<goal>copy-dependencies</goal>
+        				</goals>
+        				<configuration>
+          					<outputDirectory>${project.build.directory}/dependency</outputDirectory>
+          					<overWriteReleases>false</overWriteReleases>
+          					<overWriteSnapshots>false</overWriteSnapshots>
+          					<overWriteIfNewer>true</overWriteIfNewer>
+        				</configuration>
+      				</execution>
+    			</executions>
+  			</plugin>
+  		</plugins>
+   	
+  	</build>
+	
+    <name>pages-classification</name>
     <url>http://maven.apache.org</url>
 	
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <jaxb-api.version>2.3.0</jaxb-api.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+    	<maven.compiler.target>1.8</maven.compiler.target>
     </properties>
 
     <dependencies>           
@@ -38,6 +87,12 @@
             <groupId>edu.uci.ics</groupId>
             <artifactId>crawler4j</artifactId>
             <version>4.4.0</version>
+            <exclusions>
+            	<exclusion>
+            		<groupId>ch.qos.logback</groupId>
+                	<artifactId>logback-classic</artifactId>
+            	</exclusion>
+            </exclusions>
         </dependency>
     
         <dependency>
