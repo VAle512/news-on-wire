@@ -23,7 +23,6 @@ public class LinkCollectionFinder {
 		Map<String, Map<Integer, List<Tuple4<Integer,String, XPath, Integer>>>> referringSnapshot2XPaths = quad.stream()
 																								  			   .collect(Collectors.groupingBy(Tuple4<Integer,String, XPath, Integer>::_2, 
 																								  						Collectors.groupingBy(Tuple4<Integer,String, XPath, Integer>::_4)));
-		int counter = 0;
 		List<Set<Tuple4<Integer,String, XPath, Integer>>> result = new ArrayList<>();
 		for(Entry<String, Map<Integer, List<Tuple4<Integer,String, XPath, Integer>>>> referringPage: referringSnapshot2XPaths.entrySet()) {
 			/* Here we have all the (snapshot, list) of the same referring page */
@@ -32,7 +31,6 @@ public class LinkCollectionFinder {
 				/* Here we have all the xpaths of the same snapshot. */
 				List<Set<Tuple4<Integer,String, XPath, Integer>>> partialResult = new ArrayList<>();
 				for(Tuple4<Integer,String, XPath, Integer> current: relatedXpaths) {
-					++counter;
 					boolean siblingFound = false;
 					
 					for(Set<Tuple4<Integer,String, XPath, Integer>> entryResult: partialResult) {

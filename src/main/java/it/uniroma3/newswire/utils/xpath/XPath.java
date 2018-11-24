@@ -6,7 +6,7 @@ import scala.Tuple2;
 
 public class XPath {
 	public String xpath;
-	private List<Tuple2<String, Integer>> elements;
+	public List<Tuple2<String, Integer>> elements;
 	
 	public XPath(String xpath) {
 		this.xpath = xpath;
@@ -27,14 +27,19 @@ public class XPath {
 			int thatPosition = that.elements.get(i)._2;
 			
 			if(thisSelector.equals(thatSelector))
-				if(thisPosition!=thatPosition) 
-					if(i >= (this.elements.size() - 3))
+				if(thisPosition!=thatPosition) {
+					double currentPos = (double) i + 1;
+					double elements = (double) this.elements.size();
+
+					if(currentPos/elements >= 0.75) {
 						return true;
-					else {
+					}
 						
+					else {
 						return false;
 					
-				}		
+					}
+				}
 		}
 		return false;
 	}

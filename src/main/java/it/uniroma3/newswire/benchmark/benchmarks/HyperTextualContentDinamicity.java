@@ -1,10 +1,15 @@
 package it.uniroma3.newswire.benchmark.benchmarks;
 
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.*;
-import static it.uniroma3.newswire.properties.PropertiesReader.BENCHMARK_REDO_ALL;
+import static it.uniroma3.newswire.benchmark.utils.LinkCollectionFinder.findCollections;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.id;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.link;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referringPage;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.snapshot;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
 
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
 import org.apache.spark.api.java.JavaPairRDD;
@@ -12,9 +17,10 @@ import org.neo4j.driver.internal.util.Iterables;
 
 import com.google.common.collect.Sets;
 
-import it.uniroma3.newswire.benchmark.utils.LinkCollectionFinder;
 import it.uniroma3.newswire.persistence.DAO;
 import it.uniroma3.newswire.persistence.DAOPool;
+import it.uniroma3.newswire.properties.PropertiesReader;
+import it.uniroma3.newswire.spark.SparkLoader;
 import scala.Tuple2;
 import scala.Tuple3;
 import scala.Tuple4;
@@ -41,39 +47,19 @@ public class HyperTextualContentDinamicity extends Benchmark{
 	 * @see it.uniroma3.analysis.Analysis#analyze(boolean)
 	 */
 	@SuppressWarnings("unchecked")
-	public JavaPairRDD<String, Double> analyze(boolean persist, int untilSnapshot) {
+	public JavaPairRDD<String, Double> analyze(boolean persistResults, int untilSnapshot) {
+		DAO dao = DAOPool.getInstance().getDAO(this.database);
 		/* Erase previous Link Occurrence Dinamicity Data */
-		if(persist) {
-			DAO dao = DAOPool.getInstance().getDAO(this.database);
+		if(persistResults) {	
 			if(dao.checkTableExists(this.resultsTable))
 				dao.cleanTable(this.resultsTable);
 			else
 				dao.createAnalysisTable(this.resultsTable);
-			
-			//TODO: capire se questo crea problemi con il join
-			boolean benchmarkRedoAll = Boolean.parseBoolean(propsReader.getProperty(BENCHMARK_REDO_ALL));
-			if(benchmarkRedoAll) {
-				if(dao.checkTableExists("LinkCollections")) {
-					long linkOccurrencesCount = dao.count("LinkOccurrences");
-					long collectionsCount = dao.count("LinkCollections");
-					
-					double proportion = (double) collectionsCount / (double) linkOccurrencesCount;
-					
-					if(proportion < 0.9)
-						processCollections(dao);
-				} else {
-					processCollections(dao);
-				}
-				
-					
-			} else {
-				processCollections(dao);
-			}
-		}
+		}	
+															
+		/* recalulcate link collections. */
+		JavaPairRDD<Integer, String> collections =  processCollections(dao, untilSnapshot);
 		
-	
-		/* load up the link collections */
-		JavaPairRDD<Integer, String> collections =  loadLinkCollections();
 		JavaPairRDD<Integer, Tuple4<String, String, String, Integer>> data = loadData().mapToPair(row -> new Tuple2<>(row.getInteger(id.name()),
 																							  						 new Tuple4<>(
 																							  								 row.getString(link.name()),
@@ -82,6 +68,7 @@ public class HyperTextualContentDinamicity extends Benchmark{
 																							  								 row.getInteger(snapshot.name()))
 																							  							)
 																									);
+		
 		if(untilSnapshot > 0)
 			data = data.filter(x -> x._2._4() <= untilSnapshot);
 		
@@ -93,69 +80,87 @@ public class HyperTextualContentDinamicity extends Benchmark{
 																														  		new Tuple2<>(
 																														  				x._2._1._3(),
 																														  				x._2._1._4())));
-																														  		
-
+		
+		
 		/* Here we group by (link, referring page) to isolate link occurrences 
 		 * of the same page but picked in different snapshots.
 		 */
 		JavaPairRDD<String, Double> collectionMovement = join
 									  						/* Some XPath could be null, better to remove them. */
 									  						.filter(row -> row._1._3()!=null && row._2._1()!=null)
-									  						//TODO: lol
 									  						.groupBy(pair -> pair._1)   
 									  						.map(group -> { 
-									  							/* Let's count how many "XPath's changes" there are for a link across snaphshot. */
-									  							Set<Tuple2<String, Integer>> xpath2snapshot = Iterables.asList(group._2).stream().map(x -> x._2).collect(Collectors.toSet());			  
-									  							Set<List<Tuple2<String, Integer>>> couples = 	Sets.cartesianProduct(xpath2snapshot, xpath2snapshot);	
-										  
-									  							List<Tuple2<Integer, Integer>> erroneus = couples.stream()
-									  																			 .map(x -> new Tuple2<>(x.get(0), x.get(1)))
-									  																			 .filter(tuple -> tuple._1._2 < tuple._2._2)
-									  																			 .filter(tuple -> tuple._1._1.equals(tuple._2._1))
-									  																			 .map(tuple -> new Tuple2<>(tuple._1._2, tuple._2._2))
-									  																			 .collect(Collectors.toList());
-										  
-									  							int count = couples.stream()
-									  										       .map(x -> new Tuple2<>(x.get(0), x.get(1)))
-									  										       .filter(tuple -> (tuple._1._2 < tuple._2._2)&&(!erroneus.contains(new Tuple2<>(tuple._1._2, tuple._2._2))))
-									  										       .mapToInt(x -> {
-									  										    	   int val = (!x._1._1.equals(x._2._1)) ? 1 : 0;
-									  										    	   return val;
-									  										       })
-									  										       .sum();
-	
+									  							/* Let's count how many "XPath's changes" there are for a link across snaphshot in the same link collection. */
+									  							Set<Tuple2<String, Integer>> xpath2Snapshot = Iterables.asList(group._2).stream().map(x -> x._2).collect(Collectors.toSet());			  
+									  							Set<List<Tuple2<String, Integer>>> allPossiblesCouples = 	Sets.cartesianProduct(xpath2Snapshot, xpath2Snapshot);	
+									  							
+									  							/* We create this collection which has in it all those tuples which have a sibling avross a snapshot.
+									  							 * This is useful when we have two link occurrences whihc point to the same page and we cannot distinguish between them.
+									  							 */
+									  							final LinkedBlockingQueue<Tuple2<Integer, Integer>> misleadingEqualities = new LinkedBlockingQueue<>(
+									  																								  allPossiblesCouples.stream()
+									  																			 					  						.map(x -> new Tuple2<>(x.get(0), x.get(1)))
+									  																			 					  						.filter(tuple -> tuple._1._2 < tuple._2._2)
+									  																			 					  						.collect(Collectors.groupingBy(x -> x._1._2))
+									  																			 					  						.values()
+									  																			 					  						.stream()
+									  																			 					  							.map(tuples -> {
+									  																			 					  								int min = tuples.stream().mapToInt(x -> x._2._2).min().getAsInt();
+									  																			 					  								return tuples.stream().filter(t -> t._2._2 == min);
+									  																			 					  							})
+									  																			 					  							.flatMap(x -> x)
+									  																			 					  							.filter(tuple -> tuple._1._1.equals(tuple._2._1))
+									  																			 					  							.map(tuple -> new Tuple2<>(tuple._1._2, tuple._2._2))
+									  																			 					  							.collect(Collectors.toList()));
+
+									  							List<Tuple2<Tuple2<String, Integer>, Tuple2<String, Integer>>> differences = allPossiblesCouples.stream()
+							  										       																				.map(x -> new Tuple2<>(x.get(0), x.get(1)))
+							  										       																				.filter(tuple -> tuple._1._2 < tuple._2._2)
+							  										       																				.collect(Collectors.groupingBy(x -> x._1))
+							  										       																				.values()
+							  										       																				.stream()
+							  										       																					.map(tuples -> {
+							  										       																						int min = tuples.stream().mapToInt(x -> x._2._2).min().getAsInt();
+							  										       																						return tuples.stream().filter(t -> t._2._2 == min).collect(Collectors.toList());
+							  										       																					})
+							  										       																					.flatMap(x -> x.stream()) 
+							  										       																					.filter(x -> !x._1._1.equals(x._2._1))
+							  										       																					.distinct()
+							  										       																					.collect(Collectors.toList());
+										  								/* Let's remove all the misleading entries to make the result be more truthful. */
+										  								for(Tuple2<Integer, Integer> err: misleadingEqualities) {
+										  									boolean contained = differences.stream()
+										  														 .map(x -> new Tuple2<>(x._1._2, x._2._2))
+										  														 .anyMatch(x -> x.equals(err));
+										  									if(contained) {
+										  										Tuple2<Tuple2<String, Integer>, Tuple2<String, Integer>> toRemove = differences.stream()
+										  																											 .filter(x -> (new Tuple2<>(x._1._2, x._2._2)).equals(err))
+										  																											 .findFirst()
+										  																											 .get();
+										  										differences.remove(toRemove);																	
+										  									}
+										  								}
+										  								
+										  						long count = differences.stream().filter(x -> !x._1._1.equals(x._2._1)).count();
+			      
 									  							return new Tuple2<>(group._1, count);
 									  						})
 									  						.groupBy(x -> x._1._1())
-									  						.map(x -> new Tuple2<>(x._1,Iterables.asList(x._2).stream().mapToInt(y -> y._2).sum()))
+									  						.map(x -> new Tuple2<>(x._1,Iterables.asList(x._2).stream().mapToLong(y -> y._2).sum()))
 									  						.mapToPair(tuple -> new Tuple2<>(tuple._1, new Double(tuple._2.intValue())));
+		
+		double maxValue = collectionMovement.mapToDouble(x -> x._2).max();
 		
 		/* Persist results on the DB. 
 		 * WARNING: referringPage not persisted but could be useful! 
 		 */
-		if(persist) {
+		if(persistResults) {
 			persist(collectionMovement, resultsTable);
 		}
 
-		return collectionMovement;
+		return collectionMovement.mapToPair(x -> new Tuple2<>(x._1, new Double(x._2/maxValue))).cache();
 	}
 	
-	private JavaPairRDD<Integer, String> loadLinkCollections() {
-		String url = DAO.DB_URL.replace(DB_NAME_PLACEHOLDER, this.database);
-		
-		return sqlContext.read()
-			  	   		 .format("jdbc")
-			  	   		 .option("url", url)
-			  	   		 .option("driver", DAO.JDBC_DRIVER)
-			  	   		 .option("dbtable", "LinkCollections")
-			  	   		 .option("user", DAO.USER)
-			  	   		 .option("password", DAO.PASS)
-			  	   		 .load()
-			  	   		 .toJavaRDD()
-			  	   		 .mapToPair(row -> new Tuple2<>(row.getInt(0), row.getString(1)));
-
-	}
-
 
 	public String getCanonicalBenchmarkName() {
 		return HyperTextualContentDinamicity.class.getSimpleName()+"Benchmark";
@@ -164,10 +169,24 @@ public class HyperTextualContentDinamicity extends Benchmark{
 	public String getBenchmarkSimpleName() {
 		return HyperTextualContentDinamicity.class.getSimpleName();
 	}
-	
-	private void processCollections(DAO dao) {
-		dao.createLinkCollectionsTable();
-		List<Tuple2<String,  Set<Integer>>> collection2ids = LinkCollectionFinder.findCollections(dao.getXPaths());
-		dao.updateCollections(collection2ids);
+
+	private JavaPairRDD<Integer, String> processCollections(DAO dao, int snapshot) {
+		boolean persistLinkColections = Boolean.parseBoolean(propsReader.getProperty(PropertiesReader.BENCHMARK_PERSIST_LINK_COLLECTIONS));
+		
+		
+		if(persistLinkColections)
+			dao.createLinkCollectionsTable();
+		
+		List<Tuple2<String, Set<Integer>>> collection2ids = findCollections(dao.getXPathsUntil(snapshot));
+		
+		JavaPairRDD<Integer, String> id2collectionRDD =  SparkLoader.getInstance().getContext()
+																			 .parallelize(collection2ids)
+																			 .map(x -> x._2.stream().map(id -> new Tuple2<>(x._1, id)))
+																			 .flatMap(x -> x.iterator())
+																			 .mapToPair(x -> new Tuple2<>(x._2, x._1));
+		if(persistLinkColections)
+			dao.updateCollections(collection2ids);
+		
+		return id2collectionRDD;
 	}
 }

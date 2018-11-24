@@ -1,8 +1,5 @@
 package it.uniroma3.newswire.init;
 
-import static it.uniroma3.newswire.benchmark.BenchmarkDriver.executeLatestSnapshot;
-import static it.uniroma3.newswire.benchmark.BenchmarkDriver.executeFromTheBeginning;
-import static it.uniroma3.newswire.crawling.CrawlingDriver.crawl;
 import static it.uniroma3.newswire.properties.PropertiesReader.BENCHMARK_REDO_ALL;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_TIMEUNIT;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_TIME_TO_WAIT;
@@ -15,20 +12,21 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.spark_project.guava.io.Files;
 
 import it.uniroma3.newswire.benchmark.BenchmarkDriver;
-import it.uniroma3.newswire.crawling.CrawlingDriver;
 import it.uniroma3.newswire.persistence.DAOPool;
 import it.uniroma3.newswire.properties.PropertiesReader;
 import it.uniroma3.newswire.utils.URLUtils;
 
-public class ProgramDriver {	
+public class CLI {	
 	private static PropertiesReader propsReader = PropertiesReader.getInstance();
-	private static Logger logger = Logger.getLogger(ProgramDriver.class);
+	private static Logger logger = Logger.getLogger(CLI.class);
 	private static int timeToWait = Integer.parseInt(propsReader.getProperty(CRAWLER_TIME_TO_WAIT));
 	
 	private static final TimeUnit TIME_TO_WAIT_TIMEUNIT = TimeUnit.valueOf(propsReader.getProperty(CRAWLER_TIMEUNIT));
@@ -44,24 +42,47 @@ public class ProgramDriver {
 		boolean benchmarkRedoAll = Boolean.parseBoolean(propsReader.getProperty(BENCHMARK_REDO_ALL));
 		boolean atLeastTwoSnapshots = DAOPool.getInstance().getDatabasesDAOs().get(0).getCurrentSequence() > 1;
 		boolean justOneTime = true;
-		while(true) {
-			logger.info("Started crawling phase...");
-			
-			if(atLeastTwoSnapshots && justOneTime)
-				if(benchmarkRedoAll) 
-					executeFromTheBeginning();
-				else
-					executeLatestSnapshot();
-			
-			crawl();
-			if(!justOneTime)
-				executeLatestSnapshot();
-			
-			justOneTime = false;
-			logger.info("Waiting for " + timeToWait + " " + TIME_TO_WAIT_TIMEUNIT.toString() + ".");
 		
-			Thread.sleep(TimeUnit.MILLISECONDS.convert(timeToWait, TIME_TO_WAIT_TIMEUNIT));
-		}	
+		
+		Scanner scanner = new Scanner(System.in);
+        try {
+            if(resetAll) {
+            	System.out.println("Are you sure you want to erase all the data? [y/N]");
+            	int line = scanner.nextInt();
+            		
+            	if (line == 'N') {
+            		System.out.println("Aborting. Change mysql.resetAll=true in application.properties.");
+            		System.exit(1);
+            	}
+            }		
+        		//while(true) {
+    			logger.info("Started crawling phase...");
+    			
+//    			if(atLeastTwoSnapshots && justOneTime)
+//    				if(benchmarkRedoAll) 
+//    					executeFromTheBeginning();
+//    				else
+//    					executeLatestSnapshot();
+    			
+    			//crawl();
+    			
+//    			if(!justOneTime)
+//    			if(atLeastTwoSnapshots)
+    			
+    			BenchmarkDriver.executeUntil(5);
+    			
+//    			justOneTime = false;
+//    			logger.info("Waiting for " + timeToWait + " " + TIME_TO_WAIT_TIMEUNIT.toString() + ".");
+    		
+    			//Thread.sleep(TimeUnit.MILLISECONDS.convert(timeToWait, TIME_TO_WAIT_TIMEUNIT));
+    		//}	
+            	
+        } catch(IllegalStateException | NoSuchElementException e) {
+            // System.in has been closed
+            System.out.println("System.in was closed; exiting");
+        }
+		
+
 		
 	}
 	

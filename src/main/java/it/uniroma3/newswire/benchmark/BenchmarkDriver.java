@@ -72,16 +72,16 @@ public class BenchmarkDriver {
 				
 				/* Calculate the scores for the particular benchmark */
 				JavaPairRDD<String, Double> scores = benchmark.analyze(persist, snapshot);
-				Double benchmarkMaxValue = dao.getMaxBenchmarkScore(benchmark.getBenchmarkSimpleName());
+				Double benchmarkMaxValue = scores.mapToDouble(x -> x._2).max();
 				
 				double midValue = benchmarkMaxValue / 2.;
-				double neighborHoodFactor = benchmarkMaxValue / 10;
+				double neighborHoodFactor = benchmarkMaxValue / 10.;
 				
 				QualityMeasuresCalculator dbQualityMeasures = db2golden.get(dbName);
 				
 				try {
 					/* find the threshold that maximizes the outcoming (F1-Score) */
-					BenchmarkThresholdFinder.find(dbName, benchmark.getCanonicalBenchmarkName(), scores, midValue, dbQualityMeasures, neighborHoodFactor, benchmarkMaxValue, snapshot);
+					BenchmarkThresholdFinder.find(dbName, benchmark.getCanonicalBenchmarkName(), scores, .0, dbQualityMeasures, neighborHoodFactor, benchmarkMaxValue, snapshot);
 				} catch (InstantiationException | IllegalAccessException | IOException e) {
 					logger.error(e.getMessage());
 				}
@@ -91,6 +91,21 @@ public class BenchmarkDriver {
 			
 		});
 		
+	}
+	
+	/**
+	 * Erases all previously persisted data about benchmarks, and re-executes the entire suite snapshot by snapshot thus reconstructing the history of the crawling.
+	 * @throws InstantiationException
+	 * @throws IllegalAccessException
+	 * @throws IOException
+	 */
+	public static void executeUntil(int snapshot) throws InstantiationException, IllegalAccessException, IOException {
+		/* Sets everything up. */
+		setUp();
+		
+		/* Erase previously calculated benhcmark data */
+		DAOPool.getInstance().getDatabasesDAOs().forEach(dao -> dao.eraseBenchmarkData());
+		executeToSnapshot(snapshot, true);		
 	}
 	
 	/**
@@ -158,9 +173,9 @@ public class BenchmarkDriver {
 		DAOPool.getInstance().getDatabasesDAOsByName().forEach(dbName -> {
 			List<Benchmark> dbBenchmarks = new ArrayList<>();
 			
-			dbBenchmarks.add(new Stability(dbName));
+//			dbBenchmarks.add(new Stability(dbName));
 			dbBenchmarks.add(new HyperTextualContentDinamicity(dbName));
-			dbBenchmarks.add(new HyperTextualContentDinamycityPlusStability(dbName));
+//			dbBenchmarks.add(new HyperTextualContentDinamycityPlusStability(dbName));
 			
 			db2benchmarks.put(dbName, dbBenchmarks);
 		});

@@ -46,6 +46,7 @@ import scala.Tuple4;
  * @author Luigi D'Onofrio
  *
  */
+//TODO: replace all the static queries using enum values.
 public class DAO {	
 	private static final Logger logger = Logger.getLogger(DAO.class);
 	private static final PropertiesReader propsReader = PropertiesReader.getInstance();
@@ -90,7 +91,12 @@ public class DAO {
      * The Connection pool.
      */
     private BasicDataSource dataSource;
+    
+	/**
+	 * The database name.
+	 */
 	private String dbName;
+	
 	/**
 	 * Constructor.
 	 */
@@ -126,7 +132,7 @@ public class DAO {
 			statement = connection.createStatement();
 			
 			/* If the table already exists simply drop it! */
-			String dropTableQuery = "DROP TABLE " + LINK_OCCURRENCES_TABLE;
+			String dropTableQuery = "DROP TABLE IF EXISTS " + LINK_OCCURRENCES_TABLE;
 			try {
 				statement.execute(dropTableQuery);
 				log(INFO, "Old Table dropped [" + LINK_OCCURRENCES_TABLE + "].");
@@ -174,7 +180,7 @@ public class DAO {
 			statement = connection.createStatement();
 			
 			/* If the table already exists simply drop it! */
-			String dropTableQuery = "DROP TABLE " + LINK_COLLECTIONS_TABLE;
+			String dropTableQuery = "DROP TABLE IF EXISTS " + LINK_COLLECTIONS_TABLE;
 			try {
 				statement.execute(dropTableQuery);
 				log(INFO,"Old Table dropped [" + LINK_COLLECTIONS_TABLE + "].");
@@ -213,7 +219,7 @@ public class DAO {
 			statement = connection.createStatement();
 			
 			/* If the table already exists simply drop it! */
-			String dropTableQuery = "DROP TABLE " + tableName;
+			String dropTableQuery = "DROP TABLE IF EXISTS " + tableName;
 			try {
 				statement.execute(dropTableQuery);
 				log(INFO,"Old Table dropped [" + tableName + "].");
@@ -251,7 +257,7 @@ public class DAO {
 			statement = connection.createStatement();
 			
 			/* If the table already exists simply drop it! */
-			String dropTableQuery = "DROP TABLE " + benchmarkName;
+			String dropTableQuery = "DROP TABLE IF EXISTS " + benchmarkName;
 			try {
 				statement.execute(dropTableQuery);
 				log(INFO,"Old Table dropped [" + benchmarkName + "].");
@@ -599,6 +605,7 @@ public class DAO {
 		    
 		} catch (SQLException e) {
 			/* Reduce logging. */
+			e.printStackTrace();
 			log(ERROR,e.getMessage());
 		}finally {
 			try {
@@ -650,22 +657,19 @@ public class DAO {
 	}
 	
 	/**
-	 * Cleans up all the database;
+	 * s up all the database;
 	 */
 	public void resetData() {
 		Connection conn = getConnection();
 		Statement stmnt = null;
 		try {
 			stmnt = conn.createStatement();
-			stmnt.executeQuery("SET FOREIGN_KEY_CHECKS=0");
-			createLinkOccourrencesTable();
-			createSequence();
+			stmnt.executeUpdate("DROP DATABASE " + this.dbName);
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
 		} finally {
 			try {
-				stmnt.executeQuery("SET FOREIGN_KEY_CHECKS=1");
-				if(conn != null)
+ 				if(conn != null)
 					conn.close();
 				if(stmnt != null)
 					stmnt.close();
@@ -707,6 +711,25 @@ public class DAO {
 		try {
 			stmnt = conn.createStatement();
 			result = stmnt.executeQuery("SELECT * FROM " + LINK_OCCURRENCES_TABLE + " WHERE 1");
+			
+			while(result.next())
+				xpaths.add(new Tuple4<>(result.getInt(1), result.getString(3), new XPath(result.getString(5)), result.getInt(6)));
+		} catch (SQLException e) {
+			log(ERROR,e.getMessage());
+		}
+		
+		return xpaths;	
+	}
+	
+	public List<Tuple4<Integer, String, XPath, Integer>> getXPathsUntil(int snapshot) {
+		Connection conn = getConnection();
+		List<Tuple4<Integer, String, XPath, Integer>> xpaths = new ArrayList<>();
+		
+		ResultSet result = null;
+		Statement stmnt = null;
+		try {
+			stmnt = conn.createStatement();
+			result = stmnt.executeQuery("SELECT * FROM " + LINK_OCCURRENCES_TABLE + " WHERE snapshot <= " + snapshot);
 			
 			while(result.next())
 				xpaths.add(new Tuple4<>(result.getInt(1), result.getString(3), new XPath(result.getString(5)), result.getInt(6)));

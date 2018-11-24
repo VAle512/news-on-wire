@@ -55,9 +55,12 @@ public class PropertiesReader {
 	
 	/* BENCHMARKING */
 	public static final String BENCHMARK_REDO_ALL = "benchmark.redoAll";
+	public static final String BENCHMARK_PERSIST_LINK_COLLECTIONS = "benchmark.persistLinkCollections";
+
 	
 	private static final String ENV_VAR_CONFIG = envConfig;
 	private static final Logger logger = Logger.getLogger(PropertiesReader.class);
+	
 	private static PropertiesReader instance;
 	private Properties properties;
 	

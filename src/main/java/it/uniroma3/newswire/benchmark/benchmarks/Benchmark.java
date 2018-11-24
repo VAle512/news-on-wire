@@ -71,7 +71,8 @@ public abstract class Benchmark implements Serializable {
 			  	   										                    .append(relative.name(), 	row.getString(relative.ordinal()))
 			  	   										                    .append(xpath.name(), 			row.getString(xpath.ordinal()))
 			  	   										                    .append(snapshot.name(), 		row.getInt(snapshot.ordinal()))
-			  	   										                    .append(date.name(), 			row.getTimestamp(date.ordinal())));
+			  	   										                    .append(date.name(), 			row.getTimestamp(date.ordinal())))
+			  	   								  .cache();
 			
 		return readResult;
 	}
