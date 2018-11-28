@@ -24,7 +24,7 @@
           				<manifest>
           					<addClasspath>true</addClasspath>
                         	<classpathPrefix>${project.build.directory}/dependency</classpathPrefix>
-            				<mainClass>it.uniroma3.newswire.init.ProgramDriver</mainClass>
+            				<mainClass>it.uniroma3.newswire.cli.CLI</mainClass>
           				</manifest>
         			</archive>
       			</configuration>

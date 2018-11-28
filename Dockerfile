@@ -21,8 +21,9 @@ RUN mvn package
 ENV CONFIG_FOLDER=/app/config
 ENV DATA_FOLDER=/app/data
 ENV GOLDENS_FOLDER=/app/goldens
+ENV DEBUG_FOLDER=/app/debug
 	
 WORKDIR target
 
 # Run the jar
-CMD ["java","-jar","-Dlogs=/app/logs","pages-classification-alpha-0.1.jar"]
+CMD ["java","-jar","-Dlogs=/app/logs","-Dcli=true","pages-classification-alpha-0.1.jar"]

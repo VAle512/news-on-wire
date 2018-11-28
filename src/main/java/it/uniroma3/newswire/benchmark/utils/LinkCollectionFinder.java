@@ -19,7 +19,6 @@ public class LinkCollectionFinder {
 	@SuppressWarnings("unchecked")
 	public static List<Tuple2<String,  Set<Integer>>> findCollections(List<Tuple4<Integer,String, XPath, Integer>> quad) {
 		System.out.println("Started link collection calculation...");
-		Map<String, Set<Integer>> id2set = new TreeMap<>();
 		Map<String, Map<Integer, List<Tuple4<Integer,String, XPath, Integer>>>> referringSnapshot2XPaths = quad.stream()
 																								  			   .collect(Collectors.groupingBy(Tuple4<Integer,String, XPath, Integer>::_2, 
 																								  						Collectors.groupingBy(Tuple4<Integer,String, XPath, Integer>::_4)));

@@ -3,7 +3,13 @@
  */
 package it.uniroma3.newswire.benchmark.benchmarks;
 
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.*;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.date;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.id;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.link;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referringPage;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.relative;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.snapshot;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_DB_URL_PLACEHOLDER;
 
 import java.io.Serializable;
@@ -34,47 +40,60 @@ public abstract class Benchmark implements Serializable {
 	protected static final String LINK_OCCURRENCES = DAO.LINK_OCCURRENCES_TABLE;
 	protected static final String DB_NAME_PLACEHOLDER = propsReader.getProperty(MYSQL_DB_URL_PLACEHOLDER);
 	
-	protected static Logger logger = Logger.getLogger(Benchmark.class);
-	protected static SQLContext sqlContext;
-	
+	protected Logger logger = Logger.getLogger(Benchmark.class);
+	protected SQLContext sqlContext;
 	protected String resultsTable;
 	protected String database;
+	protected JavaRDD<Document> cachedData;
+	protected DAO dao;
 	
+	/**
+	 * Constructor.
+	 * @param dbName is the database of the website we are executing the benchmark for.
+	 */
+	public Benchmark(String dbName) {
+		this.resultsTable = getBenchmarkSimpleName(); //Not the benchmark table but the results one.
+		this.database = dbName;
+		this.dao = DAOPool.getInstance().getDAO(dbName);
+
+		init();
+	}
 	/**
 	 * Initializes the context.
 	 */
 	@SuppressWarnings("deprecation")
-	protected static void init() {
+	protected void init() {
 		JavaSparkContext jsc = SparkLoader.getInstance().getContext();
 		sqlContext = new SQLContext(jsc);
 	}
 	
 	/**
-	 * Loads up the data from the DB.
+	 * Loads up the data from the DB. It caches the data for future uses.
 	 * @return a {@link JavaRDD} of {@link Document}.
 	 */
 	public JavaRDD<Document> loadData() {		
 		String url = DAO.DB_URL.replace(DB_NAME_PLACEHOLDER, this.database);
 		
-		JavaRDD<Document> readResult =  sqlContext.read()
-			  	   								  .format("jdbc")
-			  	   								  .option("url", url)
-			  	   								  .option("driver", DAO.JDBC_DRIVER)
-			  	   								  .option("dbtable", LINK_OCCURRENCES)
-			  	   								  .option("user", DAO.USER)
-			  	   								  .option("password", DAO.PASS)
-			  	   								  .load()
-			  	   								  .toJavaRDD()
-			  	   								  .map(row -> new Document().append(id.name(), 				row.getInt(id.ordinal()))
-			  	   										                    .append(link.name(), 			row.getString(link.ordinal()))
-			  	   										                    .append(referringPage.name(), 	row.getString(referringPage.ordinal()))
-			  	   										                    .append(relative.name(), 	row.getString(relative.ordinal()))
-			  	   										                    .append(xpath.name(), 			row.getString(xpath.ordinal()))
-			  	   										                    .append(snapshot.name(), 		row.getInt(snapshot.ordinal()))
-			  	   										                    .append(date.name(), 			row.getTimestamp(date.ordinal())))
-			  	   								  .cache();
-			
-		return readResult;
+		if(cachedData == null)
+			this.cachedData =  sqlContext.read()
+			  	   						 	.format("jdbc")
+			  	   						 	.option("url", url)
+			  	   							.option("driver", DAO.JDBC_DRIVER)
+			  	   							.option("dbtable", LINK_OCCURRENCES)
+			  	   							.option("user", DAO.USER)
+			  	   							.option("password", DAO.PASS)
+			  	   							.load()
+			  	   							.toJavaRDD()
+			  	   							.map(row -> new Document().append(id.name(), 				row.getInt(id.ordinal()))
+			  	   													  .append(link.name(), 				row.getString(link.ordinal()))
+			  	   													  .append(referringPage.name(), 	row.getString(referringPage.ordinal()))
+			  	   										              .append(relative.name(), 			row.getString(relative.ordinal()))
+			  	   										              .append(xpath.name(), 			row.getString(xpath.ordinal()))
+			  	   										              .append(snapshot.name(), 			row.getInt(snapshot.ordinal()))
+			  	   										              .append(date.name(), 				row.getTimestamp(date.ordinal())))
+			  	   							.cache();
+		
+		return this.cachedData;
 	}
 	
 	/**
@@ -88,11 +107,36 @@ public abstract class Benchmark implements Serializable {
 	 */
 	public abstract JavaPairRDD<String, Double> analyze(boolean persist, int untilSnapshot);
 	
+	/**
+	 * If you have X benchmark, this will return XBenchmark.
+	 * 
+	 * @return the canonical name of the benchmark. 
+	 * 
+	 * It is used mainly for logging and table naming into the database.
+	 */
+	public String getCanonicalBenchmarkName() {
+		return this.getClass().getSimpleName() + "Benchmark";
+	}
 	
-	public void persist(JavaPairRDD<String, Double> results, String tableName) {
+	/**
+	 * If you have X benchmark, this will return X.
+	 * 
+	 * @return the simple name of the benchmark. 
+	 * 
+	 * It is used mainly for logging and table naming into the database.
+	 */
+	public String getBenchmarkSimpleName() {
+		return this.getClass().getSimpleName();
+	}
+	
+	/**
+	 * Saves results to the relative results table.
+	 * @param results is the RDD of (url, score) we want to persist.
+	 */
+	public void persist(JavaPairRDD<String, Double> results) {
 		results.foreachPartition(partitionRdd -> {
 				Connection connection = DAOPool.getInstance().getDAO(this.database).getConnection();
-				DAOPool.getInstance().getDAO(this.database).insertAnalysisResult(connection, tableName, partitionRdd);
+				DAOPool.getInstance().getDAO(this.database).insertAnalysisResult(connection, this.resultsTable, partitionRdd);
 
 				try {
 					connection.close();
@@ -104,21 +148,17 @@ public abstract class Benchmark implements Serializable {
 	}
 	
 	/**
-	 * If you have X benchmark, this will return XBenchmark.
-	 * 
-	 * @return the canonical name of the benchmark. 
-	 * 
-	 * It is used mainly for logging and table naming into the database.
+	 * If @param persistResults is true, it deletes all the previous benchmarked data, nothing otherwise. 
+	 * @param persistResults
 	 */
-	public abstract String getCanonicalBenchmarkName();
-	
-	/**
-	 * If you have X benchmark, this will return X.
-	 * 
-	 * @return the simple name of the benchmark. 
-	 * 
-	 * It is used mainly for logging and table naming into the database.
-	 */
-	public abstract String getBenchmarkSimpleName();
+	protected void erasePreviousBenchmarkData(boolean persistResults) {
+		/* Erase previous Link Occurrence Dinamicity Data */
+		if(persistResults) {	
+			if(this.dao.checkTableExists(this.resultsTable))
+				this.dao.cleanTable(this.resultsTable);
+			else
+				this.dao.createAnalysisTable(this.resultsTable);
+		}	
+	}
 		
 }

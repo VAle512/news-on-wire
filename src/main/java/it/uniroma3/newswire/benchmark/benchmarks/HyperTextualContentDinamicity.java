@@ -18,7 +18,6 @@ import org.neo4j.driver.internal.util.Iterables;
 import com.google.common.collect.Sets;
 
 import it.uniroma3.newswire.persistence.DAO;
-import it.uniroma3.newswire.persistence.DAOPool;
 import it.uniroma3.newswire.properties.PropertiesReader;
 import it.uniroma3.newswire.spark.SparkLoader;
 import scala.Tuple2;
@@ -32,33 +31,28 @@ import scala.Tuple4;
  *
  */
 public class HyperTextualContentDinamicity extends Benchmark{
-	private static final long serialVersionUID = 4965813350830416479L;
-
+	
 	/**
 	 * Constructor.
+	 * @param dbName is the database of the website we are executing the benchmark for.
 	 */
 	public HyperTextualContentDinamicity(String dbName) {
-		this.resultsTable = this.getClass().getSimpleName();
-		this.database = dbName;
-		init();
+		super(dbName);
 	}
-	
+
+	private static final long serialVersionUID = 4965813350830416479L;
+
 	/* (non-Javadoc)
 	 * @see it.uniroma3.analysis.Analysis#analyze(boolean)
 	 */
 	@SuppressWarnings("unchecked")
 	public JavaPairRDD<String, Double> analyze(boolean persistResults, int untilSnapshot) {
-		DAO dao = DAOPool.getInstance().getDAO(this.database);
-		/* Erase previous Link Occurrence Dinamicity Data */
-		if(persistResults) {	
-			if(dao.checkTableExists(this.resultsTable))
-				dao.cleanTable(this.resultsTable);
-			else
-				dao.createAnalysisTable(this.resultsTable);
-		}	
-															
+		
+		/* Erase previous Stability Data */
+		erasePreviousBenchmarkData(persistResults);
+		
 		/* recalulcate link collections. */
-		JavaPairRDD<Integer, String> collections =  processCollections(dao, untilSnapshot);
+		JavaPairRDD<Integer, String> collections =  getCollections(dao, untilSnapshot);
 		
 		JavaPairRDD<Integer, Tuple4<String, String, String, Integer>> data = loadData().mapToPair(row -> new Tuple2<>(row.getInteger(id.name()),
 																							  						 new Tuple4<>(
@@ -94,6 +88,7 @@ public class HyperTextualContentDinamicity extends Benchmark{
 									  							Set<Tuple2<String, Integer>> xpath2Snapshot = Iterables.asList(group._2).stream().map(x -> x._2).collect(Collectors.toSet());			  
 									  							Set<List<Tuple2<String, Integer>>> allPossiblesCouples = 	Sets.cartesianProduct(xpath2Snapshot, xpath2Snapshot);	
 									  							
+									  							
 									  							/* We create this collection which has in it all those tuples which have a sibling avross a snapshot.
 									  							 * This is useful when we have two link occurrences whihc point to the same page and we cannot distinguish between them.
 									  							 */
@@ -112,7 +107,7 @@ public class HyperTextualContentDinamicity extends Benchmark{
 									  																			 					  							.filter(tuple -> tuple._1._1.equals(tuple._2._1))
 									  																			 					  							.map(tuple -> new Tuple2<>(tuple._1._2, tuple._2._2))
 									  																			 					  							.collect(Collectors.toList()));
-
+									  				
 									  							List<Tuple2<Tuple2<String, Integer>, Tuple2<String, Integer>>> differences = allPossiblesCouples.stream()
 							  										       																				.map(x -> new Tuple2<>(x.get(0), x.get(1)))
 							  										       																				.filter(tuple -> tuple._1._2 < tuple._2._2)
@@ -148,33 +143,31 @@ public class HyperTextualContentDinamicity extends Benchmark{
 									  						.groupBy(x -> x._1._1())
 									  						.map(x -> new Tuple2<>(x._1,Iterables.asList(x._2).stream().mapToLong(y -> y._2).sum()))
 									  						.mapToPair(tuple -> new Tuple2<>(tuple._1, new Double(tuple._2.intValue())));
-		
-		double maxValue = collectionMovement.mapToDouble(x -> x._2).max();
-		
-		/* Persist results on the DB. 
-		 * WARNING: referringPage not persisted but could be useful! 
-		 */
-		if(persistResults) {
-			persist(collectionMovement, resultsTable);
-		}
+		//DEPRECATED: For normalization
+		//double maxValue = collectionMovement.mapToDouble(x -> x._2).max();
 
-		return collectionMovement.mapToPair(x -> new Tuple2<>(x._1, new Double(x._2/maxValue))).cache();
+
+		if(persistResults) {
+			persist(collectionMovement);
+		}
+		
+		//TODO: Bisogna capire come fare a far tornare un valore nell'intervallo 0-1 e ad utilizzarlo nelle analisi combinate.
+		//return collectionMovement.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue));
+		return collectionMovement;
 	}
 	
-
-	public String getCanonicalBenchmarkName() {
-		return HyperTextualContentDinamicity.class.getSimpleName()+"Benchmark";
-	}
-
-	public String getBenchmarkSimpleName() {
-		return HyperTextualContentDinamicity.class.getSimpleName();
-	}
-
-	private JavaPairRDD<Integer, String> processCollections(DAO dao, int snapshot) {
-		boolean persistLinkColections = Boolean.parseBoolean(propsReader.getProperty(PropertiesReader.BENCHMARK_PERSIST_LINK_COLLECTIONS));
+	/**
+	 * Wrapper method that resturns all the correspondences between id and relative collection.
+	 * @param dao is the DAO we are working on.
+	 * @param snapshot is tu snapshot we are calculating the collections for.
+	 * @return an RDD made of couples (id, collection).
+	 */
+	private JavaPairRDD<Integer, String> getCollections(DAO dao, int snapshot) {
+		/* Take the property */
+		boolean persistLinkCollections = Boolean.parseBoolean(propsReader.getProperty(PropertiesReader.BENCHMARK_PERSIST_LINK_COLLECTIONS));
 		
 		
-		if(persistLinkColections)
+		if(persistLinkCollections)
 			dao.createLinkCollectionsTable();
 		
 		List<Tuple2<String, Set<Integer>>> collection2ids = findCollections(dao.getXPathsUntil(snapshot));
@@ -184,9 +177,10 @@ public class HyperTextualContentDinamicity extends Benchmark{
 																			 .map(x -> x._2.stream().map(id -> new Tuple2<>(x._1, id)))
 																			 .flatMap(x -> x.iterator())
 																			 .mapToPair(x -> new Tuple2<>(x._2, x._1));
-		if(persistLinkColections)
+		if(persistLinkCollections)
 			dao.updateCollections(collection2ids);
 		
 		return id2collectionRDD;
 	}
+		
 }

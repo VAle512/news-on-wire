@@ -25,24 +25,16 @@ public class Stability extends Benchmark {
 	 * Constructor.
 	 */
 	public Stability(String dbName) {
-		this.resultsTable = this.getClass().getSimpleName();
-		this.database = dbName;
-		init();
+		super(dbName);
 	}
 	
 	/* (non-Javadoc)
 	 * @see it.uniroma3.analysis.Analysis#analyze(boolean)
 	 */
-	public JavaPairRDD<String, Double> analyze(boolean persist, int untilSnapshot) {
+	public JavaPairRDD<String, Double> analyze(boolean persistResults, int untilSnapshot) {
 		
 		/* Erase previous Stability Data */
-		if(persist) {
-			DAO dao = DAOPool.getInstance().getDAO(this.database);
-			if(dao.checkTableExists(this.resultsTable))
-				dao.cleanTable(this.resultsTable);
-			else
-				dao.createAnalysisTable(this.resultsTable);
-		}
+		erasePreviousBenchmarkData(persistResults);
 
 		JavaRDD<Document> rdd = loadData();
 		
@@ -66,19 +58,11 @@ public class Stability extends Benchmark {
 													  							(double) Iterables.asList(group._2).size() / (double) untilSnapshot));
 
 	   /* Persisting results into the DB. */
-	   if(persist) {
-		   persist(result, resultsTable);
+	   if(persistResults) {
+		   persist(result);
 	   }
 	   
 		return result;
 	}
 	
-	public String getCanonicalBenchmarkName() {
-		return Stability.class.getSimpleName()+"Benchmark";
-	}
-	
-
-	public String getBenchmarkSimpleName() {
-		return Stability.class.getSimpleName();
-	}
 }

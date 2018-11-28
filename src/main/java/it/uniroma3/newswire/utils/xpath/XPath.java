@@ -31,7 +31,7 @@ public class XPath {
 					double currentPos = (double) i + 1;
 					double elements = (double) this.elements.size();
 
-					if(currentPos/elements >= 0.75) {
+					if(currentPos/elements >= 0.6) {
 						return true;
 					}
 						

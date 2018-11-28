@@ -1,7 +1,8 @@
 /target
 .classpath
 /.settings
-/www.ansa.it
 /bin/
 /logs
 /data
+/debug
+/crawler/root/frontier/*

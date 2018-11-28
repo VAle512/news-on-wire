@@ -27,11 +27,13 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
+import it.uniroma3.newswire.benchmark.BenchmarkResult;
 import it.uniroma3.newswire.benchmark.benchmarks.HyperTextualContentDinamicity;
 import it.uniroma3.newswire.benchmark.benchmarks.HyperTextualContentDinamycityPlusStability;
 import it.uniroma3.newswire.benchmark.benchmarks.Stability;
@@ -439,27 +441,19 @@ public class DAO {
 		if(Double.isNaN(threshold))
 			threshold=0.;
 		
-		PreparedStatement statement = null;
-		Connection connection = getConnection();
+		Statement statement = null;
+		Connection connection = this.getConnection();
 		try {
 			
-			String  insertResultPrepared = "INSERT INTO " + benchmarkName + "(snapshot, precis, recall, f1, threshold) VALUES (?,?,?,?,?)";
-			statement = connection.prepareStatement(insertResultPrepared);
+			String  insertQuery = "INSERT INTO " + benchmarkName + "(snapshot, precis, recall, f1, threshold) VALUES (" + snapshot + ", " + precision + ", " + recall + ", " + f1 + ", " + threshold + ")";
+			statement = connection.createStatement();
 				
-			final PreparedStatement finalStat = statement;	
 			try {
-				finalStat.setInt(1, snapshot);
-				finalStat.setDouble(2, precision);
-				finalStat.setDouble(3, recall);
-				finalStat.setDouble(4, f1);
-				finalStat.setDouble(5, threshold);
-				finalStat.executeUpdate();
+				statement.executeUpdate(insertQuery);
 			} catch (SQLException e1) {
 				log(ERROR,e1.getMessage());
 				try {
-					/* Releasing resources. */
-					if(finalStat != null)
-						finalStat.close();
+
 					if(statement != null)
 						statement.close();
 					if(connection != null);
@@ -716,6 +710,17 @@ public class DAO {
 				xpaths.add(new Tuple4<>(result.getInt(1), result.getString(3), new XPath(result.getString(5)), result.getInt(6)));
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
+		} finally {
+			try {
+				if(result != null)
+					result.close();
+				if(stmnt != null)
+					result.close();
+				if(conn != null)
+				conn.close();
+			} catch (SQLException e) {
+				log(ERROR, e.getMessage());
+			}
 		}
 		
 		return xpaths;	
@@ -735,6 +740,17 @@ public class DAO {
 				xpaths.add(new Tuple4<>(result.getInt(1), result.getString(3), new XPath(result.getString(5)), result.getInt(6)));
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
+		} finally {
+			try {
+				if(result != null)
+					result.close();
+				if(stmnt != null)
+					result.close();
+				if(conn != null)
+				conn.close();
+			} catch (SQLException e) {
+				log(ERROR, e.getMessage());
+			}
 		}
 		
 		return xpaths;	
@@ -823,5 +839,67 @@ public class DAO {
 				}
 			}
 		return null;
+	}
+
+	public void saveResults(List<BenchmarkResult> results) {
+		Connection conn = this.getConnection();
+		
+		results.stream()
+				.collect(Collectors.groupingBy(x -> x.getBenchmark()))
+				.forEach((benchmark, res) -> {
+					PreparedStatement stmnt = null;
+					try {
+						stmnt = conn.prepareStatement("INSERT INTO " + benchmark + "(snapshot, precis, recall, f1, threshold) VALUES (?,?,?,?,?)");
+						
+						for(BenchmarkResult r: res) {
+							stmnt.setInt(1, r.getSnapshot());
+							stmnt.setDouble(2, r.getPrecision());
+							stmnt.setDouble(3, r.getRecall());
+							stmnt.setDouble(4, r.getF1());
+							stmnt.setDouble(5, r.getThreshold());
+							
+							stmnt.addBatch();
+						}
+						
+						stmnt.executeBatch();
+							
+					} catch (SQLException e) {
+						log(ERROR, e.getMessage());
+					} finally {
+						try {
+							if(stmnt != null)
+								stmnt.close();
+						}catch (SQLException e) {
+							log(ERROR, e.getMessage());
+						}
+					}
+				});
+		try {
+			if(conn != null)
+				conn.close();
+		} catch (SQLException e) {
+			log(ERROR, e.getMessage());
+		}
+	}
+	
+	public ResultSet executeQuery(String query) {
+		Connection connection = this.getConnection();
+		Statement stmnt = null;
+		try {
+			stmnt = connection.createStatement();
+			return stmnt.executeQuery(query);
+		}catch(SQLException e) {
+			log(ERROR, e.getMessage());
+			return null;
+		}finally {
+			try {
+				if(connection!=null)
+					connection.close();
+				if(stmnt != null)
+					stmnt.close();
+			}catch(SQLException e) {
+				log(ERROR, e.getMessage());
+			}
+		}
 	}
 }

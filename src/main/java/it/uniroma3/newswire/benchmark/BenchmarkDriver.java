@@ -17,6 +17,8 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 
+import com.google.common.collect.Lists;
+
 import it.uniroma3.newswire.benchmark.benchmarks.Benchmark;
 import it.uniroma3.newswire.benchmark.benchmarks.HyperTextualContentDinamicity;
 import it.uniroma3.newswire.benchmark.benchmarks.HyperTextualContentDinamycityPlusStability;
@@ -31,9 +33,15 @@ import it.uniroma3.newswire.persistence.DAOPool;
  */
 public class BenchmarkDriver {
 	private static Logger logger = Logger.getLogger(BenchmarkDriver.class);
-	private static Map<String, QualityMeasuresCalculator> db2golden;
-	private static Map<String,List<Benchmark>> db2benchmarks;
+	private Map<String, QualityMeasuresCalculator> db2golden;
+	private Map<String,List<Benchmark>> db2benchmarks;
+	private Map<DAO, List<BenchmarkResult>> dao2results;
 	private static int latestSnapshot;
+	
+	public BenchmarkDriver() throws InstantiationException, IllegalAccessException, IOException {
+		setUp();
+		this.dao2results = new HashMap<>();
+	}
 	
 	/**
 	 * Sets up all. 
@@ -41,7 +49,7 @@ public class BenchmarkDriver {
 	 * @throws InstantiationException
 	 * @throws IllegalAccessException
 	 */
-	private static void setUp() throws IOException, InstantiationException, IllegalAccessException {
+	private void setUp() throws IOException, InstantiationException, IllegalAccessException {
 		init();
 		loadBenchmarks();
 	}
@@ -51,7 +59,7 @@ public class BenchmarkDriver {
 	 * @param snapshot is the least snapshot we want to include for the scoring.
 	 * @param persist should be true if we want to save intermediate results onto the db, false othewise.
 	 */
-	private static void executeToSnapshot(int snapshot, boolean persist) {
+	private void executeToSnapshot(int snapshot, boolean persist) {
 		
 		/* For each saved web-site... */
 		DAOPool.getInstance().getDatabasesDAOs().forEach(dao -> {
@@ -72,16 +80,17 @@ public class BenchmarkDriver {
 				
 				/* Calculate the scores for the particular benchmark */
 				JavaPairRDD<String, Double> scores = benchmark.analyze(persist, snapshot);
+
 				Double benchmarkMaxValue = scores.mapToDouble(x -> x._2).max();
 				
-				double midValue = benchmarkMaxValue / 2.;
-				double neighborHoodFactor = benchmarkMaxValue / 10.;
+				double neighborHoodFactor = (benchmark.getCanonicalBenchmarkName().equals(HyperTextualContentDinamicity.class.getSimpleName()+"Benchmark")) ? 1. : benchmarkMaxValue / 1000.;
 				
 				QualityMeasuresCalculator dbQualityMeasures = db2golden.get(dbName);
 				
 				try {
 					/* find the threshold that maximizes the outcoming (F1-Score) */
-					BenchmarkThresholdFinder.find(dbName, benchmark.getCanonicalBenchmarkName(), scores, .0, dbQualityMeasures, neighborHoodFactor, benchmarkMaxValue, snapshot);
+					BenchmarkResult result = BenchmarkThresholdFinder.find(dbName, benchmark.getCanonicalBenchmarkName(), scores, .0, dbQualityMeasures, neighborHoodFactor, benchmarkMaxValue, snapshot);
+					addResult(dao, result);
 				} catch (InstantiationException | IllegalAccessException | IOException e) {
 					logger.error(e.getMessage());
 				}
@@ -89,8 +98,7 @@ public class BenchmarkDriver {
 				log(INFO, dao, "Ended " + benchmark.getBenchmarkSimpleName() + " benchmark.");
 			});
 			
-		});
-		
+		});		
 	}
 	
 	/**
@@ -99,13 +107,15 @@ public class BenchmarkDriver {
 	 * @throws IllegalAccessException
 	 * @throws IOException
 	 */
-	public static void executeUntil(int snapshot) throws InstantiationException, IllegalAccessException, IOException {
+	public void executeUntil(int snapshot) throws InstantiationException, IllegalAccessException, IOException {
 		/* Sets everything up. */
 		setUp();
 		
 		/* Erase previously calculated benhcmark data */
 		DAOPool.getInstance().getDatabasesDAOs().forEach(dao -> dao.eraseBenchmarkData());
-		executeToSnapshot(snapshot, true);		
+		executeToSnapshot(snapshot, true);	
+		
+//		persistAllResults();
 	}
 	
 	/**
@@ -114,7 +124,7 @@ public class BenchmarkDriver {
 	 * @throws IllegalAccessException
 	 * @throws IOException
 	 */
-	public static void executeFromTheBeginning() throws InstantiationException, IllegalAccessException, IOException {
+	public void executeFromTheBeginning() throws InstantiationException, IllegalAccessException, IOException {
 		/* Sets everything up. */
 		setUp();
 		
@@ -134,20 +144,20 @@ public class BenchmarkDriver {
 	 * @throws IllegalAccessException
 	 * @throws IOException
 	 */
-	public static void executeLatestSnapshot() throws InstantiationException, IllegalAccessException, IOException {
+	public void executeLatestSnapshot() throws InstantiationException, IllegalAccessException, IOException {
 		/* Sets everything up. */
-		setUp();
-		
+		setUp();	
 		executeToSnapshot(latestSnapshot, true);
+		
 	}
 	
 	/**
 	 * This method initializes some key stuff. 
 	 */
-	private static void init() {
+	private void init() {
 		latestSnapshot = DAOPool.getInstance().getDatabasesDAOs().stream().findFirst().get().getCurrentSequence();
 		
-		db2golden = new HashMap<>();
+		this.db2golden = new HashMap<>();
 		
 		DAOPool.getInstance().getDatabasesDAOsByName().forEach(db -> {
 			File goldenFile = getGoldenFileName(db);
@@ -167,15 +177,18 @@ public class BenchmarkDriver {
 	/**
 	 * This method initializes the benchmark suite. If you want to add/remove benchmarks, for now, u have to work here.
 	 */
-	private static void loadBenchmarks() {		
-		db2benchmarks = new HashMap<>();
+	private void loadBenchmarks() {		
+		this.db2benchmarks = new HashMap<>();
 		
 		DAOPool.getInstance().getDatabasesDAOsByName().forEach(dbName -> {
 			List<Benchmark> dbBenchmarks = new ArrayList<>();
 			
-//			dbBenchmarks.add(new Stability(dbName));
+			dbBenchmarks.add(new Stability(dbName));
 			dbBenchmarks.add(new HyperTextualContentDinamicity(dbName));
-//			dbBenchmarks.add(new HyperTextualContentDinamycityPlusStability(dbName));
+			dbBenchmarks.add(new HyperTextualContentDinamycityPlusStability(dbName));
+			
+			//FIXME: Must be fully implemented; we need more data.
+			//dbBenchmarks.add(new LinkDinamicityFactor(dbName));
 			
 			db2benchmarks.put(dbName, dbBenchmarks);
 		});
@@ -186,7 +199,7 @@ public class BenchmarkDriver {
 	 * @param dbName is the database we want retrieve the golden file of.
 	 * @return the golldlen file.
 	 */
-	private static File getGoldenFileName(String dbName) {
+	private File getGoldenFileName(String dbName) {
 		File goldenDir = new File(System.getenv(goldens));
 		
 		return Arrays.asList(goldenDir.listFiles()).stream()
@@ -203,5 +216,18 @@ public class BenchmarkDriver {
 	private static void log(Level logLevel, DAO dao, String message) {
 		String daoInfo = "[" + dao.getDatabaseName() + "]";
 		logger.log(logLevel, daoInfo + " " + message);
+	}
+	
+	private void persistAllResults() {
+		dao2results.forEach((dao, results) -> dao.saveResults(results));
+	}
+	
+	private void addResult(DAO dao, BenchmarkResult benchmarkResult) {
+		List<BenchmarkResult> results = this.dao2results.get(dao);
+		if(results != null) {
+			results.add(benchmarkResult);
+			log(INFO, dao, benchmarkResult + " added.");
+		} else
+			this.dao2results.put(dao, Lists.newArrayList(benchmarkResult));
 	}
 }
