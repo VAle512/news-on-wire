@@ -26,4 +26,4 @@ ENV DEBUG_FOLDER=/app/debug
 WORKDIR target
 
 # Run the jar
-CMD ["java","-jar","-Dlogs=/app/logs","-Dcli=true","pages-classification-alpha-0.1.jar"]
+CMD ["java","-jar","-Dlogs=/app/logs","-Dcli=false","-Dforce-crawling=true","pages-classification-alpha-0.1.jar"]

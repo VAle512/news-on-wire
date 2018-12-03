@@ -139,6 +139,23 @@ public class BenchmarkDriver {
 	}
 	
 	/**
+	 * Executes all the benchmark suite for the selected range of snapshots.
+	 * @throws InstantiationException
+	 * @throws IllegalAccessException
+	 * @throws IOException
+	 */
+	public void executeInRange(int from, int to) throws InstantiationException, IllegalAccessException, IOException {
+		/* Sets everything up. */
+		setUp();
+		
+		for(int i = from; i <= to; ++i) {
+			logger.info("Executing Benchmark suite until snapshot " + i + "...");
+			executeToSnapshot(i, false);
+		}
+			
+	}
+	
+	/**
 	 * Executes the entire benchmark suite for the latest snapshot.
 	 * @throws InstantiationException
 	 * @throws IllegalAccessException

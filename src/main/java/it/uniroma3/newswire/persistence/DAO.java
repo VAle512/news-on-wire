@@ -76,6 +76,7 @@ public class DAO {
 	/**
 	 * The name of the table used to store the Link Occurrences.
 	 */
+	//TODO: static shit
 	public static final String LINK_COLLECTIONS_TABLE = "LinkCollections";
 	/**
 	 * The name of the sequence table.
@@ -158,16 +159,7 @@ public class DAO {
 		} catch (SQLException e) {
 			log(ERROR, e.getMessage());
 		}finally {
-			try {
-				/* Releasing resources. */
-				if(statement != null)
-					statement.close();
-				if(connection != null)
-					connection.close();
-			} catch (SQLException e) {
-				log(ERROR, e.getMessage());
-			}
-			
+			clearResources(connection, statement, null, null);
 		}
 	}
 	
@@ -198,15 +190,7 @@ public class DAO {
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
 		}finally {
-			try {
-				/* Releasing resources. */
-				if(statement != null)
-					statement.close();
-				if(connection != null)
-					connection.close();
-			} catch (SQLException e) {
-				log(ERROR,e.getMessage());
-			}
+			clearResources(connection, statement, null, null);
 		}
 	}
 	
@@ -236,15 +220,7 @@ public class DAO {
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
 		}finally {
-			try {
-				/* Releasing resources. */
-				if(statement != null)
-					statement.close();
-				if(connection != null)
-					connection.close();
-			} catch (SQLException e) {
-				log(ERROR,e.getMessage());
-			}
+			clearResources(connection, statement, null, null);
 		}
 	}
 	
@@ -277,15 +253,7 @@ public class DAO {
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
 		}finally {
-			try {
-				/* Releasing resources. */
-				if(statement != null)
-					statement.close();
-				if(connection != null)
-					connection.close();
-			} catch (SQLException e) {
-				log(ERROR,e.getMessage());
-			}
+			clearResources(connection, statement, null, null);
 		}
 	}
 	
@@ -319,10 +287,8 @@ public class DAO {
 				statement.executeUpdate("UPDATE " + SEQUENCE_TABLE_NAME + " SET sequence_value = 0 WHERE id = '" + SEQUENCE_ID + "'");
 				
 				/* Releasing resources. */
-				if(statement != null)
-					statement.close();
-				if(connection != null)
-					connection.close();
+				clearResources(connection, statement, null, null);
+				
 			} catch (SQLException e) {
 				log(ERROR,e.getMessage());
 			}
@@ -348,15 +314,7 @@ public class DAO {
 		} catch (SQLException e) {
 			log(ERROR,"Sequence [" + SEQUENCE_TABLE_NAME + "] not created.");
 		}finally {
-			try {
-				/* Releasing resources. */
-				if(statement != null)
-					statement.close();
-				if(connection != null)
-					connection.close();
-			} catch (SQLException e) {
-				log(ERROR,e.getMessage());
-			}
+			clearResources(connection, statement, null, null);
 		}
 	}
 	
@@ -384,17 +342,7 @@ public class DAO {
 			log(ERROR,e.getMessage());
 			snapshot = -1;
 		}finally {
-			try {
-				/* Releasing resources. */
-				if(statement != null)
-					statement.close();
-				if(result != null)
-					result.close();
-				if(connection != null)
-					connection.close();
-			} catch (SQLException e) {
-				log(ERROR,e.getMessage());
-			}
+			clearResources(connection, statement, null, result);
 		}
 		return snapshot;
 
@@ -414,14 +362,8 @@ public class DAO {
 						finalStat.executeUpdate();
 					} catch (SQLException e1) {
 						log(ERROR,e1.getMessage());
-						try {
-							/* Releasing resources. */
-							if(finalStat != null)
-								finalStat.close();
-							return;
-						}catch(SQLException e2) {
-							log(ERROR,e2.getMessage());
-						}
+					} finally {
+						clearResources(null, finalStat, null, null);
 					}
 			});
 		}catch(SQLException e3) {
@@ -451,17 +393,9 @@ public class DAO {
 			try {
 				statement.executeUpdate(insertQuery);
 			} catch (SQLException e1) {
-				log(ERROR,e1.getMessage());
-				try {
-
-					if(statement != null)
-						statement.close();
-					if(connection != null);
-						connection.close();
-					return;
-				}catch(SQLException e2) {
-					log(ERROR,e2.getMessage());
-				}
+				log(ERROR,e1.getMessage());			
+			}finally {
+				clearResources(connection, statement, null, null);
 			}
 		}catch(SQLException e3) {
 			log(ERROR,e3.getMessage());
@@ -478,27 +412,40 @@ public class DAO {
 			String  insertResultPrepared = "SELECT max(score) FROM " + benchmarkName;
 			statement = connection.createStatement();
 			result = statement.executeQuery(insertResultPrepared);	
+			
 			if(result.next())
 				return result.getDouble(1);
 			
 			} catch (SQLException e1) {
 				log(ERROR,e1.getMessage());
-				try {
-					/* Releasing resources. */
-					if(statement != null)
-						statement.close();
-					if(connection != null);
-						connection.close();
-					if(result != null);
-						result.close();
-					return null;
-				}catch(SQLException e2) {
-					log(ERROR,e2.getMessage());
-					return null;
-				}
+				return null;
+			} finally {
+				clearResources(connection, statement, null, result);
 			}
+		
 		return null;
 	}
+	
+	private void clearResources(Connection connection, Statement statement, PreparedStatement prepStatement, ResultSet resultSet) {
+		try {
+			/* Releasing resources. */
+			if(statement != null)
+				statement.close();
+			
+			if(connection != null)
+				connection.close();
+				
+			if(resultSet != null)
+				resultSet.close();
+				
+			if(prepStatement != null)
+				prepStatement.close();
+			
+		}catch(SQLException e2) {
+			log(ERROR,e2.getMessage());
+		}
+	}
+	
 	
 	/**
 	 * Inserts a link occurrence into the dedicated table.
@@ -510,7 +457,6 @@ public class DAO {
 	 */
 	public void insertLinkOccourrence(Connection connection, String linkToInsert, String referringPageToInsert, String relativeToInsert, String xpathToInsert) {
 		Statement statement = null;
-		ResultSet result = null;
 		PreparedStatement pstat = null;
 		
 		try {
@@ -550,17 +496,7 @@ public class DAO {
 			/* Reduce logging. */
 			//log(ERROR,e.getMessage());
 		}finally {
-			try {
-				/* Releasing resources. */
-				if(statement != null)
-					statement.close();
-				if(result != null)
-					result.close();
-				if(pstat != null)
-					pstat.close();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			clearResources(connection, statement, pstat, null);
 		}
 	 
 	}
@@ -574,7 +510,6 @@ public class DAO {
 	public void updateCollections(List<Tuple2<String, Set<Integer>>> bindings) {
 		log(INFO,"Updating link colections...");
 		Statement statement = null;
-		ResultSet result = null;
 		PreparedStatement pstat = null;
 		
 		Connection connection = getConnection();
@@ -602,17 +537,7 @@ public class DAO {
 			e.printStackTrace();
 			log(ERROR,e.getMessage());
 		}finally {
-			try {
-				/* Releasing resources. */
-				if(statement != null)
-					statement.close();
-				if(result != null)
-					result.close();
-				if(pstat != null)
-					pstat.close();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			clearResources(connection, statement, pstat, null);
 		}
 		
 		log(INFO,"Inserted Correctly.");
@@ -636,17 +561,7 @@ public class DAO {
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
 		}finally {
-			try {
-				/* Releasing resources. */
-				if(conn != null)
-					conn.close();
-				if(check != null)
-					check.close();
-				if(statement != null)
-					statement.close();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+			clearResources(conn, statement, null, check);
 		}
 	}
 	
@@ -659,17 +574,13 @@ public class DAO {
 		try {
 			stmnt = conn.createStatement();
 			stmnt.executeUpdate("DROP DATABASE " + this.dbName);
+			stmnt.executeUpdate("CREATE DATABASE " + this.dbName);
+			createLinkOccourrencesTable();
+			createSequence();
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
 		} finally {
-			try {
- 				if(conn != null)
-					conn.close();
-				if(stmnt != null)
-					stmnt.close();
-			} catch (SQLException e) {
-				log(ERROR,e.getMessage());
-			}
+			clearResources(conn, stmnt, null, null);
 		}
 		
 	}
@@ -711,16 +622,7 @@ public class DAO {
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
 		} finally {
-			try {
-				if(result != null)
-					result.close();
-				if(stmnt != null)
-					result.close();
-				if(conn != null)
-				conn.close();
-			} catch (SQLException e) {
-				log(ERROR, e.getMessage());
-			}
+			clearResources(conn, stmnt, null, result);
 		}
 		
 		return xpaths;	
@@ -741,16 +643,7 @@ public class DAO {
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
 		} finally {
-			try {
-				if(result != null)
-					result.close();
-				if(stmnt != null)
-					result.close();
-				if(conn != null)
-				conn.close();
-			} catch (SQLException e) {
-				log(ERROR, e.getMessage());
-			}
+			clearResources(conn, stmnt, null, result);
 		}
 		
 		return xpaths;	
@@ -781,16 +674,7 @@ public class DAO {
 			log(ERROR,e.getMessage());
 			return false;
 		} finally {
-			try {
-				if(results != null)
-					results.close();
-				if(statement != null)
-					statement.close();
-				if (conn != null)
-					conn.close();
-			} catch(SQLException e) {
-				log(ERROR,e.getMessage());
-			}
+			clearResources(conn, statement, null, results);
 		}
 
 	}
@@ -824,19 +708,10 @@ public class DAO {
 			
 			} catch (SQLException e1) {
 				log(ERROR,e1.getMessage());
-				try {
-					/* Releasing resources. */
-					if(statement != null)
-						statement.close();
-					if(connection != null);
-						connection.close();
-					if(result != null);
-						result.close();
-					return null;
-				}catch(SQLException e2) {
-					log(ERROR,e2.getMessage());
-					return null;
-				}
+				return null;
+			
+			} finally {
+				clearResources(connection, statement, null, result);
 			}
 		return null;
 	}
@@ -866,20 +741,10 @@ public class DAO {
 					} catch (SQLException e) {
 						log(ERROR, e.getMessage());
 					} finally {
-						try {
-							if(stmnt != null)
-								stmnt.close();
-						}catch (SQLException e) {
-							log(ERROR, e.getMessage());
-						}
+						clearResources(null, stmnt, null, null);
 					}
 				});
-		try {
-			if(conn != null)
-				conn.close();
-		} catch (SQLException e) {
-			log(ERROR, e.getMessage());
-		}
+		clearResources(conn, null, null, null);
 	}
 	
 	public ResultSet executeQuery(String query) {
@@ -892,14 +757,7 @@ public class DAO {
 			log(ERROR, e.getMessage());
 			return null;
 		}finally {
-			try {
-				if(connection!=null)
-					connection.close();
-				if(stmnt != null)
-					stmnt.close();
-			}catch(SQLException e) {
-				log(ERROR, e.getMessage());
-			}
+			clearResources(connection, stmnt, null, null);
 		}
 	}
 }
