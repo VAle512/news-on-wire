@@ -54,6 +54,7 @@ public class Init {
 		
 		while(true) {
 			crawl();
+			logger.info("Waiting for " + timeToWait + " " + TIME_TO_WAIT_TIMEUNIT.toString().toLowerCase());
 			Thread.currentThread().sleep(TIME_TO_WAIT_TIMEUNIT.toMillis(timeToWait));
 		}
 	}
@@ -72,7 +73,8 @@ public class Init {
 	protected static void init(boolean resetAll) throws IOException {
 		String configPath = System.getenv(envConfig);
 		File seedFile = new File(configPath + File.separator + "seeds");
-
+		
+		//TODO: Rivedere responsabilità e anche praticità
 		if(resetAll)
 			Files.readLines(seedFile, StandardCharsets.UTF_8)
 				 .stream()

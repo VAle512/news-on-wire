@@ -16,7 +16,6 @@ COPY ./src /app/src
 
 # Pack everything into a .jar
 RUN mvn package
-# RUN mvn dependency:copy-dependencies
 
 ENV CONFIG_FOLDER=/app/config
 ENV DATA_FOLDER=/app/data

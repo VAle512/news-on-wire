@@ -17,6 +17,7 @@ import edu.uci.ics.crawler4j.crawler.CrawlController;
 import edu.uci.ics.crawler4j.fetcher.PageFetcher;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtConfig;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
+import it.uniroma3.newswire.persistence.ConcurrentPersister;
 import it.uniroma3.newswire.persistence.DAO;
 import it.uniroma3.newswire.persistence.DAOPool;
 import it.uniroma3.newswire.properties.PropertiesReader;
@@ -75,9 +76,15 @@ public class CrawlingDriver {
 		 */
 
 		DAOPool.getInstance().getDatabasesDAOs().forEach(db -> db.incrementSequence());
+		ConcurrentPersister concPersister = new ConcurrentPersister();
+		concPersister.start();
 		
 		logger.info("Starting crawler...");
 		
-		controller.start(Crawler.class, NUM_CRAWLERS);
+		controller.start(() -> new Crawler(concPersister), 32);
+		
+		/* Shutdown the current crawling session */
+		if(controller.isFinished()) // Should be blocking in case of Non-Blocking crawling
+			controller.shutdown();
 	}
 }

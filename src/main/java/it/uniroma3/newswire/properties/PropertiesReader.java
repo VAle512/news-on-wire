@@ -38,6 +38,8 @@ public class PropertiesReader {
 	public static final String CRAWLER_FILE_TO_WRITE_ON = "crawler.writeon";
 	public static final String CRAWLER_SOCIAL_EXCLUDE_LIST = "crawler.social.excludeList";
 	public static final String CRAWLER_GOLDEN_DIR = "crawler.golden.dir";
+	public static final String CRAWLER_PERSISTENCE_BATCH_SIZE = "crawler.persistence.batchSize";
+	public static final String CRAWLER_PERSISTENCE_THREAD_COUNT = "crawler.persistence.threadCount";
 	
 	/* MYSQL */
 	public static final String MYSQL_RESET_ALL = "mysql.resetAll"; 
@@ -49,6 +51,7 @@ public class PropertiesReader {
 	public static final String MYSQL_URLS_TABLE_NAME = "mysql.tables.urls";
 	public static final String MYSQL_STABILITY_TABLE_NAME = "mysql.tables.stability";
 	public static final String MYSQL_LINK_OCCURRENCES_TABLE_NAME = "mysql.tables.links";
+	public static final String MYSQL_LINK_COLLECTIONS_TABLE_NAME = "mysql.tables.collections";
 	public static final String MYSQL_SEQUENCE_TABLE_NAME = "mysql.tables.sequence";
 	public static final String MYSQL_SEQUENCE_ID = "mysql.tables.sequence.id";
 	public static final String MYSQL_IPS_TABLE_NAME = "mysql.tables.ips";

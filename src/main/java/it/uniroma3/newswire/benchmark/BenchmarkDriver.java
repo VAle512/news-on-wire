@@ -38,6 +38,13 @@ public class BenchmarkDriver {
 	private Map<DAO, List<BenchmarkResult>> dao2results;
 	private static int latestSnapshot;
 	
+	/**
+	 * Constructor.
+	 * 
+	 * @throws InstantiationException
+	 * @throws IllegalAccessException
+	 * @throws IOException
+	 */
 	public BenchmarkDriver() throws InstantiationException, IllegalAccessException, IOException {
 		setUp();
 		this.dao2results = new HashMap<>();
@@ -114,8 +121,7 @@ public class BenchmarkDriver {
 		/* Erase previously calculated benhcmark data */
 		DAOPool.getInstance().getDatabasesDAOs().forEach(dao -> dao.eraseBenchmarkData());
 		executeToSnapshot(snapshot, true);	
-		
-//		persistAllResults();
+	
 	}
 	
 	/**
@@ -235,6 +241,7 @@ public class BenchmarkDriver {
 		logger.log(logLevel, daoInfo + " " + message);
 	}
 	
+	@SuppressWarnings("unused")
 	private void persistAllResults() {
 		dao2results.forEach((dao, results) -> dao.saveResults(results));
 	}

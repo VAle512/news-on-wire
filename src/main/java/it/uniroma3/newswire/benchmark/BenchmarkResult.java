@@ -1,5 +1,12 @@
 package it.uniroma3.newswire.benchmark;
 
+/**
+ * This class models a benchmark result. 
+ * It is composed of a precision value, recall, f1 and the best threshold for the benchmark itself.
+ * It is also provided the name of the benchmark to identify the kind of this element as long as the snapshot of interest.
+ * @author root
+ *
+ */
 public class BenchmarkResult {
 	private String benchmark;
 	private Double precision;
@@ -30,48 +37,25 @@ public class BenchmarkResult {
 		return benchmark;
 	}
 
-	public void setBenchmark(String benchmark) {
-		this.benchmark = benchmark;
-	}
-
 	public Double getPrecision() {
 		return precision;
-	}
-
-	public void setPrecision(Double precision) {
-		this.precision = precision;
 	}
 
 	public Double getRecall() {
 		return recall;
 	}
 
-	public void setRecall(Double recall) {
-		this.recall = recall;
-	}
-
 	public Double getF1() {
 		return f1;
-	}
-
-	public void setF1(Double f1) {
-		this.f1 = f1;
 	}
 
 	public Double getThreshold() {
 		return threshold;
 	}
 
-	public void setThreshold(Double threshold) {
-		this.threshold = threshold;
-	}
 
 	public int getSnapshot() {
 		return snapshot;
-	}
-
-	public void setSnapshot(int snapshot) {
-		this.snapshot = snapshot;
 	}
 
 }

@@ -34,7 +34,6 @@ public class PageSaver {
 		/* persisting effective pages */
 		String dataOutputPath = System.getenv(envData);
 		String folderHierarchy = dataOutputPath + "/" + url.replace("http://", "");
-		
 		File f = new File(folderHierarchy);
 		
 		/* creates the folders hierarchy */

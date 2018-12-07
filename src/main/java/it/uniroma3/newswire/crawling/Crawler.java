@@ -5,8 +5,6 @@ import static it.uniroma3.newswire.utils.URLUtils.canonicalize;
 import static org.joox.JOOX.$;
 
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -21,12 +19,14 @@ import org.jsoup.safety.Whitelist;
 
 import edu.uci.ics.crawler4j.crawler.Page;
 import edu.uci.ics.crawler4j.crawler.WebCrawler;
+import edu.uci.ics.crawler4j.frontier.DocIDServer;
 import edu.uci.ics.crawler4j.parser.HtmlParseData;
 import edu.uci.ics.crawler4j.url.WebURL;
-import it.uniroma3.newswire.persistence.DAOPool;
+import it.uniroma3.newswire.persistence.ConcurrentPersister;
 import it.uniroma3.newswire.properties.PropertiesReader;
 import it.uniroma3.newswire.utils.PageSaver;
 import it.uniroma3.newswire.utils.URLUtils;
+import scala.Tuple4;
 
 /**
  * This class represents the crawler effectively doing the job.
@@ -40,7 +40,7 @@ public class Crawler extends WebCrawler {
 	private static final PropertiesReader propsReader = PropertiesReader.getInstance();
 	private final static Pattern FILE_FILTERS = Pattern.compile(".*(\\.(" + propsReader.getProperty(CRAWLER_EXCLUDE_LIST).replaceAll(",", "|") + "))$");
 	private final static boolean isPersistEnabled = true;
-	
+	private ConcurrentPersister persister;
 	/* (non-Javadoc)
 	 * @see edu.uci.ics.crawler4j.crawler.WebCrawler#shouldVisit(edu.uci.ics.crawler4j.crawler.Page, edu.uci.ics.crawler4j.url.WebURL)
 	 */
@@ -51,18 +51,38 @@ public class Crawler extends WebCrawler {
 		return shouldBeVisited(href, domain);
 	}
 	
-	//TODO: Enable it on another crawl cycle. 
+	public Crawler(ConcurrentPersister persister) {
+		this.persister = persister;
+	}
+	
 //	@Override
 //	protected WebURL handleUrlBeforeProcess(WebURL curURL) {
 //		curURL.setURL(URLUtils.encode(curURL.getURL()));
 //		return curURL;
 //	}
-	
+//	
 	/* (non-Javadoc)
 	 * @see edu.uci.ics.crawler4j.crawler.WebCrawler#visit(edu.uci.ics.crawler4j.crawler.Page)
 	 */
+	
+	@Override
+	protected void onUnhandledException(WebURL webUrl, Throwable e) {
+		DocIDServer idServer = this.getMyController().getDocIdServer();
+		String url = webUrl.getURL();
+		int docId = idServer.getNewDocID(url);
+		if(!idServer.isSeenBefore(url)) {
+			try {
+				idServer.addUrlAndDocId(url, docId);
+				logger.info(url + " blacklisted.");
+			} catch (Exception e1) {
+				logger.info(e1.getMessage());
+			}
+		}
+	}
+	
 	@Override
 	public void visit(Page page) {
+		long startTime = System.currentTimeMillis();
 		String domain = page.getWebURL().getDomain();
 		
 		/* Parse the HTML */
@@ -73,8 +93,12 @@ public class Crawler extends WebCrawler {
 		HtmlParseData htmlParseData = (HtmlParseData) page.getParseData();
 			
 		/* If needed download the page too. */
-		if(isPersistEnabled)
-			PageSaver.savePageOnFileSystem(page);
+		//TODO: I/O, maybe better to remove it?
+		if(isPersistEnabled) {
+//			new Thread(() ->  {
+				PageSaver.savePageOnFileSystem(page);
+//			});
+		}
 		
 		/* This is done due to get the XPath of the links in the current page in the next steps. */
 		Document doc = Jsoup.parse(Jsoup.clean(htmlParseData.getHtml(),"http://" + domain, Whitelist.relaxed().addTags("img").preserveRelativeLinks(true).removeTags("script")));
@@ -89,7 +113,7 @@ public class Crawler extends WebCrawler {
 		Set<WebURL> outgoingLinks = htmlParseData.getOutgoingUrls();
 			
 		String domaninForDAO = URLUtils.domainOf(page.getWebURL().getURL());
-		Connection connection = DAOPool.getInstance().getDAO(domaninForDAO).getConnection();
+//		Connection connection = DAOPool.getInstance().getDAO(domaninForDAO).getConnection();
 		
 		outgoingLinks.stream()
 					 .filter(x -> x != null)
@@ -119,18 +143,23 @@ public class Crawler extends WebCrawler {
 								
 								xpaths.forEach(xpath -> {
 									if(!xpath.matches(".+\\/a\\[\\d+\\]"))
-										return;							
-									DAOPool.getInstance().getDAO(domaninForDAO).insertLinkOccourrence(connection, absolute, referringPage, href, xpath);
+										return;
+									if(xpath != null)
+										this.persister.addToQueue(new Tuple4<>(absolute, href, referringPage, xpath));
+									
+									//DAOPool.getInstance().getDAO(domaninForDAO).insertLinkOccourrence(connection, absolute, referringPage, href, xpath);
 								});
 								
 					 		});
-			try {
-				if(connection != null)
-					connection.close();
-			} catch (SQLException e) {
-				logger.error(e.getMessage());
-			}
-			logger.info("Number of outgoing links fetched: " +  outgoingLinks.size());
+//		this.persister.printQueueStatus();
+//			try {
+//				if(connection != null)
+//					connection.close();
+//			} catch (SQLException e) {
+//				logger.error(e.getMessage());
+//			}
+			long inTime = System.currentTimeMillis() - startTime;
+			logger.info("Number of outgoing links fetched: " +  outgoingLinks.size() + " -- in " + inTime + " ms.");
 	}
 	
 	private boolean shouldBeVisited(String url, String domain) {
