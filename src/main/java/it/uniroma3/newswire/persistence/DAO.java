@@ -9,6 +9,7 @@ import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_DB_URL;
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_DB_URL_PLACEHOLDER;
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_JDBC_DRIVER;
+import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_LINK_COLLECTIONS_TABLE_NAME;
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_LINK_OCCURRENCES_TABLE_NAME;
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_PASS;
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_SEQUENCE_ID;
@@ -76,8 +77,7 @@ public class DAO {
 	/**
 	 * The name of the table used to store the Link Occurrences.
 	 */
-	//TODO: static shit
-	public static final String LINK_COLLECTIONS_TABLE = "LinkCollections";
+	public static final String LINK_COLLECTIONS_TABLE = propsReader.getProperty(MYSQL_LINK_COLLECTIONS_TABLE_NAME);
 	/**
 	 * The name of the sequence table.
 	 */
@@ -144,7 +144,7 @@ public class DAO {
 			}
 			
 			/* ...and then (re)create it. */
-			String createTableQuery = "CREATE TABLE " + LINK_OCCURRENCES_TABLE + " (id int AUTO_INCREMENT, "
+			String createTableQuery = "CREATE TABLE " + LINK_OCCURRENCES_TABLE + " (id bigint AUTO_INCREMENT, "
 																			   +   "link varchar(2083) NOT NULL, "
 																			   +   "referringPage varchar(2083) NOT NULL, "
 																			   +   "relativeLink varchar(2083), "
@@ -372,6 +372,7 @@ public class DAO {
 		}
 	}
 	
+	//TODO: Refactor usando BenchmarkResult
 	public void insertBenchmark(String benchmarkName, int snapshot, double precision, double recall, double f1, double threshold) {
 		/* Check if some value is NaN */
 		if(Double.isNaN(precision))
@@ -455,6 +456,7 @@ public class DAO {
 	 * @param relativeToInsert is the relative URL of the link we are adding the occurrence for.
 	 * @param xpathToInsert is the position where we found this link.
 	 */
+	//TODO: Cambiare in bigInt l'autoincrement e poi pushare.
 	public void insertLinkOccourrence(Connection connection, String linkToInsert, String referringPageToInsert, String relativeToInsert, String xpathToInsert) {
 		Statement statement = null;
 		PreparedStatement pstat = null;
@@ -496,7 +498,59 @@ public class DAO {
 			/* Reduce logging. */
 			//log(ERROR,e.getMessage());
 		}finally {
-			clearResources(connection, statement, pstat, null);
+			clearResources(null, statement, pstat, null);
+		}
+	 
+	}
+	
+	/**
+	 * Inserts a link occurrences batch into the dedicated table.
+	 * @param connection is the {@link Connection} to the DB.
+	 * @param linkToInsert is the link we want to add the occurrence for (absolute URL).
+	 * @param referringPageToInsert is the page we found this link in.
+	 * @param relativeToInsert is the relative URL of the link we are adding the occurrence for.
+	 * @param xpathToInsert is the position where we found this link.
+	 */
+	public void insertLinkOccourrencesBatch(List<Tuple4<String, String, String, String>> batch) {
+		PreparedStatement pstat = null;
+		Connection connection = this.getConnection();
+		
+		try {
+			/* Retrieve the current snapshot counter. */
+			int currentSnapshot = this.getCurrentSequence();
+		    String insertLinkOccurrenceQuery = "INSERT INTO " + LINK_OCCURRENCES_TABLE + "(link, referringPage, relativeLink, xpath, snapshot, date) values(?,?,?,?,?,?)";	    
+		    pstat = connection.prepareStatement(insertLinkOccurrenceQuery);
+
+			for(Tuple4<String, String, String, String> fourth: batch) {
+				String linkToInsert = fourth._1();
+				String referringPageToInsert = fourth._2();
+				String relativeToInsert = fourth._3();
+				String xpathToInsert = fourth._4();
+				
+				/* If xpath's null it's useless */
+				if(xpathToInsert==null) 
+					continue;	
+				
+				
+			    Timestamp sqlDate = new Timestamp(new java.util.Date().getTime());
+			    
+			    pstat.setString(link.ordinal(), linkToInsert);
+			    pstat.setString(referringPage.ordinal(), referringPageToInsert);
+			    pstat.setString(relative.ordinal(), relativeToInsert);
+			    pstat.setString(xpath.ordinal(), xpathToInsert);
+			    pstat.setInt(snapshot.ordinal(), currentSnapshot);
+			    pstat.setTimestamp(date.ordinal(), sqlDate);  
+			    pstat.addBatch();
+			}
+			
+			pstat.executeBatch();
+			
+			   
+		} catch (SQLException e) {
+			/* Reduce logging. */
+			log(ERROR,e.getMessage());
+		}finally {
+			clearResources(connection, null, pstat, null);
 		}
 	 
 	}
