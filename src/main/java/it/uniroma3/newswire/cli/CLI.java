@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import it.uniroma3.newswire.benchmark.BenchmarkDriver;
+import it.uniroma3.newswire.classification.ThreeMeans;
 import it.uniroma3.newswire.persistence.DAO;
 import it.uniroma3.newswire.persistence.DAOPool;
 
@@ -22,21 +23,25 @@ public class CLI {
 			showChoices();
 
 			int choice = scanner.nextInt();
-
+			
+			/* Executes the entire benchmark suite for all websites at the latest snapshot. */
 			if(choice == 1) {
-				(new BenchmarkDriver()).executeLatestSnapshot();
+				(new BenchmarkDriver()).executeAllBenchmarksAllDAOsAtLatestSnapshot();
 			}
-
+			
+			/* Execute the entire benchmark suite all across snapshots: All DAOs, All benchmaks. */
 			if(choice == 2) {
-				(new BenchmarkDriver()).executeFromTheBeginning();
+				(new BenchmarkDriver()).executeAllBenchmarksFromTheBeginning();
 			}
-
+			
+			/* Execute the entire benchmark suite for a specified snapshot */
 			if(choice == 3) {
 				System.out.println("Please insert the snapshot you want to execute the benchmark suite for:");
 				int snapshot = scanner.nextInt();
-				(new BenchmarkDriver()).executeUntil(snapshot);
+				(new BenchmarkDriver()).executeAllBenchmarksAllDAOsAt(snapshot, true);
 			}
-
+			
+			/* Execute the entire benchmark suite for a specified website */
 			if(choice == 4) {
 				init(false);
 				AtomicInteger i = new AtomicInteger(0);
@@ -46,9 +51,15 @@ public class CLI {
 				choice2dao.entrySet().forEach(entry -> System.out.println("\t" + entry.getKey() + ". " + entry.getValue().getDatabaseName()));
 
 				System.out.println("Your choice: ");
+				int daoChoiceId = scanner.nextInt();
+				
+				DAO chosenDAO = choice2dao.get(daoChoiceId);
+				
+				System.out.println("Please insert the snapshot you want to execute the benchmark suite for:");
 				int snapshot = scanner.nextInt();
-				//TODO: Complete this
-				(new BenchmarkDriver()).executeUntil(snapshot);
+				
+				
+				(new BenchmarkDriver()).executeAllBenchmarksAt(chosenDAO, snapshot, true);
 			}
 
 			if(choice == 5) {
@@ -56,30 +67,49 @@ public class CLI {
 
 				int fromSnapshot;
 				int toSnapshot;
-				//FIXME: Non correttissimo.
-				int latestSnapshot = DAOPool.getInstance().getDatabasesDAOs().get(0).getCurrentSequence();
-
+				
+				int absoluteLatestSnapshot = DAOPool.getInstance().getAbsoluteMaximumSnapshot();
+				
 				do {
 					System.out.println("Please insert the snapshot you want to start the benchmark:");
 					System.out.println("Your choice: ");
 					fromSnapshot = scanner.nextInt();
 				} while(fromSnapshot < 0);
 
-
-
 				do {
 					System.out.println("Please insert the snapshot you want to end the benchmark:");
 					System.out.println("Your choice: ");
 					toSnapshot = scanner.nextInt();
-				}while(toSnapshot > latestSnapshot);
+				}while(toSnapshot > absoluteLatestSnapshot);
 
 
-				(new BenchmarkDriver()).executeInRange(fromSnapshot, toSnapshot);
+				(new BenchmarkDriver()).executeAllBenchmarksAllDAOsInRange(fromSnapshot, toSnapshot);
+			}
+			
+			if(choice == 6) {
+				init(false);
+
+				AtomicInteger i = new AtomicInteger(0);
+
+				System.out.println("Please insert the database you want to execute the benchmark suite for:");
+				Map<Integer, DAO> choice2dao = DAOPool.getInstance().getDatabasesDAOs().stream().collect(Collectors.toMap(x -> i.incrementAndGet(), x -> x));
+				choice2dao.entrySet().forEach(entry -> System.out.println("\t" + entry.getKey() + ". " + entry.getValue().getDatabaseName()));
+
+				System.out.println("Your choice: ");
+				int daoChoiceId = scanner.nextInt();
+				
+				DAO chosenDAO = choice2dao.get(daoChoiceId);
+				
+				System.out.println("Please insert the snapshot you want to execute the benchmark suite for:");
+				int snapshot = scanner.nextInt();
+				
+				ThreeMeans.calculate(chosenDAO.getDatabaseName(), snapshot);
+				
 			}
 
 		} catch(IllegalStateException | NoSuchElementException e) {
 			// System.in has been closed
-			System.out.println("System.in was closed; exiting");
+			e.printStackTrace();
 		} finally {
 			scanner.close();
 		}
@@ -96,6 +126,7 @@ private static void showChoices() throws IOException {
 	System.out.println("\t3. Execute the entire benchmark suite for a specified snapshot");
 	System.out.println("\t4. Execute the entire benchmark suite for a specified website");
 	System.out.println("\t5. Execute the entire benchmark suite for a specified snapshots range.");
+	System.out.println("\t6. Cluster a specified website.");
 }
 
 }

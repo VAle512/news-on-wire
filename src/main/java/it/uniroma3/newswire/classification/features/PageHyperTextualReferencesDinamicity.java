@@ -1,4 +1,4 @@
-package it.uniroma3.newswire.benchmark.benchmarks;
+package it.uniroma3.newswire.classification.features;
 
 import static it.uniroma3.newswire.benchmark.utils.LinkCollectionFinder.findCollections;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.id;
@@ -6,8 +6,10 @@ import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.link;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referringPage;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.snapshot;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
+import static org.apache.log4j.Level.INFO;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
@@ -15,6 +17,7 @@ import java.util.stream.Collectors;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.neo4j.driver.internal.util.Iterables;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 import it.uniroma3.newswire.persistence.DAO;
@@ -30,13 +33,13 @@ import scala.Tuple4;
  * @author Luigi D'Onofrio
  *
  */
-public class HyperTextualContentDinamicity extends Benchmark{
+public class PageHyperTextualReferencesDinamicity extends Feature{
 	
 	/**
 	 * Constructor.
 	 * @param dbName is the database of the website we are executing the benchmark for.
 	 */
-	public HyperTextualContentDinamicity(String dbName) {
+	public PageHyperTextualReferencesDinamicity(String dbName) {
 		super(dbName);
 	}
 
@@ -46,15 +49,18 @@ public class HyperTextualContentDinamicity extends Benchmark{
 	 * @see it.uniroma3.analysis.Analysis#analyze(boolean)
 	 */
 	@SuppressWarnings("unchecked")
-	public JavaPairRDD<String, Double> analyze(boolean persistResults, int untilSnapshot) {
+	public JavaPairRDD<String, Double> calculate(boolean persistResults, int untilSnapshot) {
+		log(INFO, "started");
 		
 		/* Erase previous Stability Data */
-		erasePreviousBenchmarkData(persistResults);
+		if(persistResults)
+			erasePreviousBenchmarkData(persistResults);
 		
 		/* recalulcate link collections. */
-		JavaPairRDD<Integer, String> collections =  getCollections(dao, untilSnapshot);
+		JavaPairRDD<Long, String> collections =  getCollections(getAssociatedDAO(), untilSnapshot);
 		
-		JavaPairRDD<Integer, Tuple4<String, String, String, Integer>> data = loadData().mapToPair(row -> new Tuple2<>(row.getInteger(id.name()),
+		//FIXME: Debug purposes swapped relative and referringPage
+		JavaPairRDD<Long, Tuple4<String, String, String, Integer>> data = loadData().mapToPair(row -> new Tuple2<>(row.getLong(id.name()),
 																							  						 new Tuple4<>(
 																							  								 row.getString(link.name()),
 																							  								 row.getString(referringPage.name()),
@@ -62,6 +68,12 @@ public class HyperTextualContentDinamicity extends Benchmark{
 																							  								 row.getInteger(snapshot.name()))
 																							  							)
 																									);
+		
+		Map<String, Long> link2Counterino = data.map(x -> x._2)
+														.groupBy(x -> x._1())
+														.mapToPair(x -> new Tuple2<>(x._1, Lists.newArrayList(x._2).stream().count()))
+														.collectAsMap();
+
 		
 		if(untilSnapshot > 0)
 			data = data.filter(x -> x._2._4() <= untilSnapshot);
@@ -86,7 +98,7 @@ public class HyperTextualContentDinamicity extends Benchmark{
 									  						.map(group -> { 
 									  							/* Let's count how many "XPath's changes" there are for a link across snaphshot in the same link collection. */
 									  							Set<Tuple2<String, Integer>> xpath2Snapshot = Iterables.asList(group._2).stream().map(x -> x._2).collect(Collectors.toSet());			  
-									  							Set<List<Tuple2<String, Integer>>> allPossiblesCouples = 	Sets.cartesianProduct(xpath2Snapshot, xpath2Snapshot);	
+									  							Set<List<Tuple2<String, Integer>>> allPossiblesCouples = Sets.cartesianProduct(xpath2Snapshot, xpath2Snapshot);	
 									  							
 									  							
 									  							/* We create this collection which has in it all those tuples which have a sibling avross a snapshot.
@@ -141,19 +153,27 @@ public class HyperTextualContentDinamicity extends Benchmark{
 									  							return new Tuple2<>(group._1, count);
 									  						})
 									  						.groupBy(x -> x._1._1())
-									  						.map(x -> new Tuple2<>(x._1,Iterables.asList(x._2).stream().mapToLong(y -> y._2).sum()))
-									  						.mapToPair(tuple -> new Tuple2<>(tuple._1, new Double(tuple._2.intValue())));
+									  						//TODO: normalize on num of occurrences
+									  						.map(x -> {
+//									  							double count = (link2Counterino.get(x._1) != null) ? link2Counterino.get(x._1): 1;
+									  							long differences = Iterables.asList(x._2).stream().mapToLong(y -> y._2).sum();
+									  							return new Tuple2<>(x._1, differences);
+									  						})
+									  						.mapToPair(tuple -> new Tuple2<>(tuple._1, new Double(tuple._2)));
 		//DEPRECATED: For normalization
-		//double maxValue = collectionMovement.mapToDouble(x -> x._2).max();
+		double maxValue = collectionMovement.mapToDouble(x -> x._2).max();
 
 
 		if(persistResults) {
-			persist(collectionMovement);
+			persist(collectionMovement.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue)));
 		}
+		
+		log(INFO, "ended.");
+
 		
 		//TODO: Bisogna capire come fare a far tornare un valore nell'intervallo 0-1 e ad utilizzarlo nelle analisi combinate.
 		//return collectionMovement.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue));
-		return collectionMovement;
+		return collectionMovement.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue));
 	}
 	
 	/**
@@ -162,7 +182,7 @@ public class HyperTextualContentDinamicity extends Benchmark{
 	 * @param snapshot is tu snapshot we are calculating the collections for.
 	 * @return an RDD made of couples (id, collection).
 	 */
-	private JavaPairRDD<Integer, String> getCollections(DAO dao, int snapshot) {
+	private JavaPairRDD<Long, String> getCollections(DAO dao, int snapshot) {
 		/* Take the property */
 		boolean persistLinkCollections = Boolean.parseBoolean(propsReader.getProperty(PropertiesReader.BENCHMARK_PERSIST_LINK_COLLECTIONS));
 		
@@ -170,9 +190,9 @@ public class HyperTextualContentDinamicity extends Benchmark{
 		if(persistLinkCollections)
 			dao.createLinkCollectionsTable();
 		
-		List<Tuple2<String, Set<Integer>>> collection2ids = findCollections(dao.getXPathsUntil(snapshot));
+		List<Tuple2<String, Set<Long>>> collection2ids = findCollections(dao.getXPathsUntil(snapshot));
 		
-		JavaPairRDD<Integer, String> id2collectionRDD =  SparkLoader.getInstance().getContext()
+		JavaPairRDD<Long, String> id2collectionRDD =  SparkLoader.getInstance().getContext()
 																			 .parallelize(collection2ids)
 																			 .map(x -> x._2.stream().map(id -> new Tuple2<>(x._1, id)))
 																			 .flatMap(x -> x.iterator())
@@ -181,6 +201,18 @@ public class HyperTextualContentDinamicity extends Benchmark{
 			dao.updateCollections(collection2ids);
 		
 		return id2collectionRDD;
+	}
+
+	/* (non-Javadoc)
+	 * @see it.uniroma3.newswire.benchmark.benchmarks.Benchmark#isThresholded(java.lang.Double, java.lang.Double)
+	 */
+	@Override
+	public boolean isThresholded(Double score, Double threshold) {
+		return score <= threshold;
+	}
+	
+	private double sigmoidOf(Long n) {
+		return 1 / (1 + Math.exp(-n));
 	}
 		
 }

@@ -6,3 +6,6 @@
 /data
 /debug
 /crawler
+/.m2
+buildDocker.sh
+start.sh

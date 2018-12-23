@@ -1,5 +1,7 @@
 package it.uniroma3.newswire.benchmark;
 
+import it.uniroma3.newswire.classification.features.Feature;
+
 /**
  * This class models a benchmark result. 
  * It is composed of a precision value, recall, f1 and the best threshold for the benchmark itself.
@@ -8,7 +10,8 @@ package it.uniroma3.newswire.benchmark;
  *
  */
 public class BenchmarkResult {
-	private String benchmark;
+	private String benchmarkName;
+	private Feature benchmark;
 	private Double precision;
 	private Double recall;
 	private Double f1;
@@ -23,9 +26,10 @@ public class BenchmarkResult {
 	 * @param f1
 	 * @param thresholsd
 	 */
-	public BenchmarkResult(String benchmarkName, Double precision, Double recall, Double f1, Double thresholsd, int snapshot) {
+	public BenchmarkResult(Feature benchmark, Double precision, Double recall, Double f1, Double thresholsd, int snapshot) {
 		super();
-		this.benchmark = benchmarkName;
+		this.benchmark = benchmark;
+		this.benchmarkName = benchmark.getCanonicalBenchmarkName();
 		this.precision = precision;
 		this.recall = recall;
 		this.f1 = f1;
@@ -33,8 +37,12 @@ public class BenchmarkResult {
 		this.snapshot = snapshot;
 	}
 
-	public String getBenchmark() {
-		return benchmark;
+	public String getBenchmarkName() {
+		return benchmarkName;
+	}
+	
+	public Feature getBenchmark() {
+		return this.benchmark;
 	}
 
 	public Double getPrecision() {
@@ -56,6 +64,10 @@ public class BenchmarkResult {
 
 	public int getSnapshot() {
 		return snapshot;
+	}
+	
+	public String toString() {
+		return "p: " + this.precision + " --- r: " + this.recall + " --- f1: " + this.getF1() + " --- t: " + this.threshold;
 	}
 
 }

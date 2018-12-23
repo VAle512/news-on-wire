@@ -10,6 +10,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +69,8 @@ public class DAOPool {
 			boolean exists = checkForExistence(dbName);
 			
 			if(!exists) {
+				logger.info("Prevented erasing.");
+				System.exit(0);
 				createDB(dbName);
 			}
 			
@@ -82,6 +85,12 @@ public class DAOPool {
 		}		
 	}
 	
+	public int getAbsoluteMaximumSnapshot() {
+		return this.getDatabasesDAOs().stream()
+									  .mapToInt(dao -> dao.getCurrentSequence())
+									  .max().getAsInt();
+	}
+	
 	/**
 	 * Checks for the existence of a specific database. 
 	 * It returns true if the database exists, false otherwise.
@@ -91,7 +100,6 @@ public class DAOPool {
 	private static boolean checkForExistence(String dbName) {
 		boolean exists = false;
 		String url = DB_URL.replace(DB_NAME_PLACEHOLDER, "");
-		
 		BasicDataSource dataSource = new BasicDataSource();
 		
 		dataSource.setDriverClassName(JDBC_DRIVER);
@@ -105,6 +113,7 @@ public class DAOPool {
 		try {
 			
 			conn = dataSource.getConnection();
+			System.out.println(conn!=null);
 			dbs = conn.getMetaData().getCatalogs();
 			
 			while(dbs.next() && !exists)
@@ -112,7 +121,7 @@ public class DAOPool {
 					exists = true;
 			
 		} catch (SQLException e) {
-			logger.error(e.getMessage());
+			e.printStackTrace();
 		} finally {
 			try {
 				if(conn != null)
@@ -184,6 +193,50 @@ public class DAOPool {
 	 */
 	public List<DAO> getDatabasesDAOs() {
 		return databaseName2DAO.values().stream().collect(Collectors.toList());
+	}
+	
+	public void loadAllDAOs() {
+		String[] banList = {"information_schema", "performance_schema", "sys", "mysql"};
+		String url = DB_URL.replace(DB_NAME_PLACEHOLDER, "");
+		BasicDataSource dataSource = new BasicDataSource();
+		
+		dataSource.setDriverClassName(JDBC_DRIVER);
+		dataSource.setUrl(url);
+		dataSource.setUsername(USER);
+		dataSource.setPassword(PASS);
+		
+		Connection conn = null;
+		Statement stmnt = null;
+		ResultSet dbs = null;
+		try {
+			
+			conn = dataSource.getConnection();
+			dbs = conn.getMetaData().getCatalogs();
+			
+			while(dbs.next()) {
+				String dbName = dbs.getString(1);
+				if(!Arrays.asList(banList).contains(dbName))
+					this.getDAO(dbName);
+			}
+				
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			try {
+				if(conn != null)
+					conn.close();
+				if(stmnt != null)
+					stmnt.close();
+				if(dbs != null)
+					dbs.close();
+				if(dataSource != null)
+					dataSource.close();
+			} catch (SQLException e) {
+					logger.error(e.getMessage());
+			}
+		}
+		
 	}
 	
 	/**

@@ -145,7 +145,8 @@ public class Crawler extends WebCrawler {
 									if(!xpath.matches(".+\\/a\\[\\d+\\]"))
 										return;
 									if(xpath != null)
-										this.persister.addToQueue(new Tuple4<>(absolute, href, referringPage, xpath));
+										// Adjusted
+										this.persister.addToQueue(new Tuple4<>(absolute, referringPage, href, xpath));
 									
 									//DAOPool.getInstance().getDAO(domaninForDAO).insertLinkOccourrence(connection, absolute, referringPage, href, xpath);
 								});

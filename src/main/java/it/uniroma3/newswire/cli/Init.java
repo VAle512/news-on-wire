@@ -37,17 +37,22 @@ public class Init {
 		boolean forceCrawlOnly = Boolean.parseBoolean(System.getProperty(FORCE_CRAWLING_PROPERTY));
 		boolean useCLI = Boolean.parseBoolean(System.getProperty(USE_CLI_PROPERTY));
 		
-		if(forceCrawlOnly)
-			doCrawl();
-		else if (useCLI)
-			showCLI();
+//		if(forceCrawlOnly)
+//			doCrawl();
+//		else if (useCLI)
+		showCLI();
+		
 		
 	}
 	
 	@SuppressWarnings("static-access")
 	private static void doCrawl() throws Exception {
 		logger.info("Crawling started...");
-		boolean resetAll = Boolean.parseBoolean(propsReader.getProperty(MYSQL_RESET_ALL));
+		boolean resetAll = false;
+		/* Personal protection. */
+//		boolean resetAll = Boolean.parseBoolean(propsReader.getProperty(MYSQL_RESET_ALL));
+		/* Never erase anything resume everytime */
+		
 		checkGoldens();
 		
 		init(resetAll);
@@ -75,14 +80,14 @@ public class Init {
 		File seedFile = new File(configPath + File.separator + "seeds");
 		
 		//TODO: Rivedere responsabilità e anche praticità
+		//TODO: Aggiungere l'eliminazione anche dei file, controllare responsabilità.
 		if(resetAll)
 			Files.readLines(seedFile, StandardCharsets.UTF_8)
 				 .stream()
 				 .forEach(seed -> DAOPool.getInstance().getDAO(URLUtils.domainOf(seed)).resetData());	
 			
-		Files.readLines(seedFile, StandardCharsets.UTF_8)
-			 .stream()
-			 .forEach(seed -> DAOPool.getInstance().getDAO(URLUtils.domainOf(seed)));
+		DAOPool.getInstance().loadAllDAOs();
 		
 	}
+
 }

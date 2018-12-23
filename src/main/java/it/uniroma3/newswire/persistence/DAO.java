@@ -18,6 +18,7 @@ import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_USER;
 import static org.apache.log4j.Level.ERROR;
 import static org.apache.log4j.Level.INFO;
 
+import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -28,16 +29,20 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.neo4j.driver.internal.util.Iterables;
+
+import com.google.common.collect.Lists;
 
 import it.uniroma3.newswire.benchmark.BenchmarkResult;
-import it.uniroma3.newswire.benchmark.benchmarks.HyperTextualContentDinamicity;
-import it.uniroma3.newswire.benchmark.benchmarks.HyperTextualContentDinamycityPlusStability;
-import it.uniroma3.newswire.benchmark.benchmarks.Stability;
+import it.uniroma3.newswire.classification.features.PageHyperTextualReferencesDinamicity;
+import it.uniroma3.newswire.classification.features.HyperTextualContentDinamycityPlusStability;
+import it.uniroma3.newswire.classification.features.Stability;
 import it.uniroma3.newswire.properties.PropertiesReader;
 import it.uniroma3.newswire.utils.xpath.XPath;
 import scala.Tuple2;
@@ -50,7 +55,12 @@ import scala.Tuple4;
  *
  */
 //TODO: replace all the static queries using enum values.
-public class DAO {	
+//TODO: Check for unused methods.
+public class DAO implements Serializable{	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = 2689974262603276962L;
 	private static final Logger logger = Logger.getLogger(DAO.class);
 	private static final PropertiesReader propsReader = PropertiesReader.getInstance();
 	
@@ -111,7 +121,8 @@ public class DAO {
 		}
 		this.dataSource = new BasicDataSource();
 		this.dataSource.setDriverClassName(JDBC_DRIVER);
-        this.dataSource.setUrl(DB_URL.replace(DB_NAME_PLACEHOLDER, dbName));
+		String url = DB_URL.replace(DB_NAME_PLACEHOLDER, dbName);
+        this.dataSource.setUrl(url);
         this.dataSource.setUsername(USER);
         this.dataSource.setPassword(PASS);
         this.dataSource.setMaxOpenPreparedStatements(16);
@@ -181,7 +192,7 @@ public class DAO {
 			} catch(SQLException e) {}
 			
 			/* ...and then (re)create it. */
-			String createTableQuery = "CREATE TABLE " + LINK_COLLECTIONS_TABLE + "(id int(11) NOT NULL, "
+			String createTableQuery = "CREATE TABLE " + LINK_COLLECTIONS_TABLE + "(id bigint NOT NULL, "
 																	  			+ "collection varchar(255) NOT NULL,"
 																	  			+ "FOREIGN KEY (id) REFERENCES LinkOccourrences(id))";
 			statement.execute(createTableQuery);
@@ -348,28 +359,36 @@ public class DAO {
 
 	}
 	
-	public void insertAnalysisResult(Connection connection, String tableName, Iterator<Tuple2<String, Double>> docs) {
+	public void insertAnalysisResult(String tableName, Iterator<Tuple2<String, Double>> docs) {
+		
 		PreparedStatement statement = null;
+		Connection connection = getConnection();
 		try {
 			String  insertResultPrepared = "INSERT INTO " + tableName + "(url, score) VALUES (?,?)";
 			statement = connection.prepareStatement(insertResultPrepared);
-				
-			final PreparedStatement finalStat = statement;
-			docs.forEachRemaining(doc -> {
-					try {
-						finalStat.setString(1, doc._1);
-						finalStat.setDouble(2, doc._2);
-						finalStat.executeUpdate();
-					} catch (SQLException e1) {
-						log(ERROR,e1.getMessage());
-					} finally {
-						clearResources(null, finalStat, null, null);
-					}
-			});
-		}catch(SQLException e3) {
-			log(ERROR,e3.getMessage());
-		
+		}catch(SQLException e) {
+			log(ERROR, "Preparing statment.");
 		}
+			
+		
+		PreparedStatement finalStat = statement;
+		AtomicInteger count = new AtomicInteger(0);
+		
+		docs.forEachRemaining(doc -> {
+						try {
+							finalStat.setString(1, doc._1);
+							finalStat.setDouble(2, doc._2);
+							finalStat.executeUpdate();
+							count.incrementAndGet();
+						}catch(SQLException e3) {
+							log(ERROR,e3.getMessage());
+						}
+						
+				});		
+		
+		clearResources(connection, statement, null, null);
+		log(INFO, "Persisted " + count + " objects");
+
 	}
 	
 	//TODO: Refactor usando BenchmarkResult
@@ -561,7 +580,7 @@ public class DAO {
 	 * @param idLinkOccurence is the id of the bound link occurrence.
 	 * @param collection is the collection we want to bind idLinkOccurrence to.
 	 */
-	public void updateCollections(List<Tuple2<String, Set<Integer>>> bindings) {
+	public void updateCollections(List<Tuple2<String, Set<Long>>> bindings) {
 		log(INFO,"Updating link colections...");
 		Statement statement = null;
 		PreparedStatement pstat = null;
@@ -573,11 +592,11 @@ public class DAO {
 		    
 		    pstat = connection.prepareStatement(insertLinkOccurrenceQuery);
 		    int count = 0;
-		    for(Tuple2<String, Set<Integer>> entry: bindings) {
+		    for(Tuple2<String, Set<Long>> entry: bindings) {
 		    	count++;
 		    	
-		    	for(Integer id: entry._2) {
-		    		pstat.setInt(1, id);
+		    	for(Long id: entry._2) {
+		    		pstat.setLong(1, id);
 		    		pstat.setString(2, entry._1);
 		    		pstat.addBatch();
 		    	}
@@ -682,9 +701,9 @@ public class DAO {
 		return xpaths;	
 	}
 	
-	public List<Tuple4<Integer, String, XPath, Integer>> getXPathsUntil(int snapshot) {
+	public List<Tuple4<Long, String, XPath, Integer>> getXPathsUntil(int snapshot) {
 		Connection conn = getConnection();
-		List<Tuple4<Integer, String, XPath, Integer>> xpaths = new ArrayList<>();
+		List<Tuple4<Long, String, XPath, Integer>> xpaths = new ArrayList<>();
 		
 		ResultSet result = null;
 		Statement stmnt = null;
@@ -693,7 +712,7 @@ public class DAO {
 			result = stmnt.executeQuery("SELECT * FROM " + LINK_OCCURRENCES_TABLE + " WHERE snapshot <= " + snapshot);
 			
 			while(result.next())
-				xpaths.add(new Tuple4<>(result.getInt(1), result.getString(3), new XPath(result.getString(5)), result.getInt(6)));
+				xpaths.add(new Tuple4<>(result.getLong(1), result.getString(3), new XPath(result.getString(5)), result.getInt(6)));
 		} catch (SQLException e) {
 			log(ERROR,e.getMessage());
 		} finally {
@@ -744,7 +763,7 @@ public class DAO {
 	
 	public void eraseBenchmarkData() {	
 		this.cleanTable((new Stability(this.dbName)).getCanonicalBenchmarkName());
-		this.cleanTable((new HyperTextualContentDinamicity(this.dbName)).getCanonicalBenchmarkName());
+		this.cleanTable((new PageHyperTextualReferencesDinamicity(this.dbName)).getCanonicalBenchmarkName());
 		this.cleanTable((new HyperTextualContentDinamycityPlusStability(this.dbName)).getCanonicalBenchmarkName());	
 	}
 	

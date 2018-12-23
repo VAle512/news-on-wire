@@ -21,8 +21,11 @@ ENV CONFIG_FOLDER=/app/config
 ENV DATA_FOLDER=/app/data
 ENV GOLDENS_FOLDER=/app/goldens
 ENV DEBUG_FOLDER=/app/debug
+# ENV MODELS_FOLDER=/app/models
 	
 WORKDIR target
+EXPOSE 4040
 
 # Run the jar
-CMD ["java","-jar","-Dlogs=/app/logs","-Dcli=false","-Dforce-crawling=true","pages-classification-alpha-0.1.jar"]
+CMD ["java","-jar","-Xms24g","-Xmx50g","-Dlogs=/app/logs","-Dcli=true","-Dforce-crawling=false","pages-classification-alpha-0.1.jar"]
+

@@ -1,4 +1,6 @@
-package it.uniroma3.newswire.benchmark.benchmarks;
+package it.uniroma3.newswire.classification.features;
+
+import static org.apache.log4j.Level.INFO;
 
 import org.apache.spark.api.java.JavaPairRDD;
 
@@ -9,7 +11,7 @@ import scala.Tuple2;
  * @author Luigi D'Onofrio
  *
  */
-public class HyperTextualContentDinamycityPlusStability extends Benchmark{
+public class HyperTextualContentDinamycityPlusStability extends Feature{
 	private static final long serialVersionUID = 510592752307143679L;
 
 	private JavaPairRDD<String, Double> hyperTextualContentDinamycityRDD;
@@ -26,11 +28,12 @@ public class HyperTextualContentDinamycityPlusStability extends Benchmark{
 	/* (non-Javadoc)
 	 * @see it.uniroma3.analysis.String#analyze(boolean)
 	 */
-	public JavaPairRDD<String, Double> analyze(boolean persistResults, int untilSnapshot) {
+	public JavaPairRDD<String, Double> calculate(boolean persistResults, int untilSnapshot) {
+		log(INFO, "started");
+
+		this.hyperTextualContentDinamycityRDD = (new PageHyperTextualReferencesDinamicity(this.database)).calculate(persistResults, untilSnapshot);
 		
-		this.hyperTextualContentDinamycityRDD = (new HyperTextualContentDinamicity(this.database)).analyze(persistResults, untilSnapshot);
-		
-		this.stabilityRDD = (new Stability(this.database)).analyze(persistResults, untilSnapshot);
+		this.stabilityRDD = (new Stability(this.database)).calculate(persistResults, untilSnapshot);
 
 		/* Erase previous Combined Data */
 		erasePreviousBenchmarkData(persistResults);
@@ -50,7 +53,17 @@ public class HyperTextualContentDinamycityPlusStability extends Benchmark{
 			persist(combined);
 		}
 		
+		log(INFO, "ended.");
+
 		return combined;
+	}
+	
+	/* (non-Javadoc)
+	 * @see it.uniroma3.newswire.benchmark.benchmarks.Benchmark#isThresholded(java.lang.Double, java.lang.Double)
+	 */
+	@Override
+	public boolean isThresholded(Double score, Double threshold) {
+		return score <= threshold;
 	}
 
 }

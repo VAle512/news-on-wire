@@ -22,7 +22,13 @@ public class SparkLoader {
 	 */
 	private SparkLoader() {
 		SparkConf sparkConf = new SparkConf().setAppName(propsReader.getProperty(SPARK_APP_NAME))
-											 .setMaster(propsReader.getProperty(SPARK_MASTER));
+											 .setMaster(propsReader.getProperty(SPARK_MASTER))
+											 .set("spark.memory.useLegacyMode", "true")
+											 .set("spark.network.timeout", "600s")
+											 .set("spark.executor.heartbeatInterval", "30s")
+											 .set("spark.storage.memoryFraction","0.8");
+		
+		
 		this.jsc = new JavaSparkContext(sparkConf);
 	}
 	

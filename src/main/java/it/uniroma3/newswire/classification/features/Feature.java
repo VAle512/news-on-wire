@@ -1,7 +1,7 @@
 /**
  * 
  */
-package it.uniroma3.newswire.benchmark.benchmarks;
+package it.uniroma3.newswire.classification.features;
 
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.date;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.id;
@@ -16,6 +16,7 @@ import java.io.Serializable;
 import java.sql.Connection;
 import java.sql.SQLException;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -32,7 +33,7 @@ import it.uniroma3.newswire.spark.SparkLoader;
  * @author Luigi D'Onofrio
  *
  */
-public abstract class Benchmark implements Serializable {
+public abstract class Feature implements Serializable {
 	private static final long serialVersionUID = 8907698548835775816L;
 
 	protected static PropertiesReader propsReader = PropertiesReader.getInstance();
@@ -40,22 +41,19 @@ public abstract class Benchmark implements Serializable {
 	protected static final String LINK_OCCURRENCES = DAO.LINK_OCCURRENCES_TABLE;
 	protected static final String DB_NAME_PLACEHOLDER = propsReader.getProperty(MYSQL_DB_URL_PLACEHOLDER);
 	
-	protected Logger logger = Logger.getLogger(Benchmark.class);
+	protected static final Logger logger = Logger.getLogger(Feature.class);
 	protected SQLContext sqlContext;
 	protected String resultsTable;
 	protected String database;
 	protected JavaRDD<Document> cachedData;
-	protected DAO dao;
 	
 	/**
 	 * Constructor.
 	 * @param dbName is the database of the website we are executing the benchmark for.
 	 */
-	public Benchmark(String dbName) {
+	public Feature(String dbName) {
 		this.resultsTable = getBenchmarkSimpleName(); //Not the benchmark table but the results one.
 		this.database = dbName;
-		this.dao = DAOPool.getInstance().getDAO(dbName);
-
 		init();
 	}
 	/**
@@ -84,7 +82,7 @@ public abstract class Benchmark implements Serializable {
 			  	   							.option("password", DAO.PASS)
 			  	   							.load()
 			  	   							.toJavaRDD()
-			  	   							.map(row -> new Document().append(id.name(), 				row.getInt(id.ordinal()))
+			  	   							.map(row -> new Document().append(id.name(), 				row.getLong(id.ordinal()))
 			  	   													  .append(link.name(), 				row.getString(link.ordinal()))
 			  	   													  .append(referringPage.name(), 	row.getString(referringPage.ordinal()))
 			  	   										              .append(relative.name(), 			row.getString(relative.ordinal()))
@@ -95,7 +93,7 @@ public abstract class Benchmark implements Serializable {
 		
 		return this.cachedData;
 	}
-	
+		
 	/**
 	 * Does the analysis.
 	 * @param persist should be true if you want to persist results on the DB, false otherwise.
@@ -105,7 +103,7 @@ public abstract class Benchmark implements Serializable {
 	 * 	<ul><b>score</b>: the score for this analysis</ul>
 	 * </li>
 	 */
-	public abstract JavaPairRDD<String, Double> analyze(boolean persist, int untilSnapshot);
+	public abstract JavaPairRDD<String, Double> calculate(boolean persist, int untilSnapshot);
 	
 	/**
 	 * If you have X benchmark, this will return XBenchmark.
@@ -134,15 +132,8 @@ public abstract class Benchmark implements Serializable {
 	 * @param results is the RDD of (url, score) we want to persist.
 	 */
 	public void persist(JavaPairRDD<String, Double> results) {
-		results.foreachPartition(partitionRdd -> {
-				Connection connection = DAOPool.getInstance().getDAO(this.database).getConnection();
-				DAOPool.getInstance().getDAO(this.database).insertAnalysisResult(connection, this.resultsTable, partitionRdd);
-
-				try {
-					connection.close();
-				} catch (SQLException e) {
-					logger.error(e.getMessage());
-				}
+		results.foreachPartition(partitionRdd -> {	
+				DAOPool.getInstance().getDAO(this.database).insertAnalysisResult(this.resultsTable, partitionRdd);
 		});
 		logger.info("Results have been correctly saved to the DB.");
 	}
@@ -154,11 +145,32 @@ public abstract class Benchmark implements Serializable {
 	protected void erasePreviousBenchmarkData(boolean persistResults) {
 		/* Erase previous Link Occurrence Dinamicity Data */
 		if(persistResults) {	
-			if(this.dao.checkTableExists(this.resultsTable))
-				this.dao.cleanTable(this.resultsTable);
+			if(this.getAssociatedDAO().checkTableExists(this.resultsTable))
+				this.getAssociatedDAO().cleanTable(this.resultsTable);
 			else
-				this.dao.createAnalysisTable(this.resultsTable);
+				this.getAssociatedDAO().createAnalysisTable(this.resultsTable);
 		}	
+	}
+	
+	/**
+	 * Returns the DAO associated with this benchmark.
+	 * @return the DAO.
+	 */
+	public DAO getAssociatedDAO() {
+		return DAOPool.getInstance().getDAO(this.database);
+	}
+	
+	
+	/**
+	 * @param score
+	 * @param threshold
+	 * @return true if score is thresholded to threshold, false otherwise.
+	 */
+	public abstract boolean isThresholded(Double score, Double threshold);
+	
+	protected void log(Level level, String message) {
+		String toAppend = "[" + this.database + "] -- " + this.getClass().getSimpleName() +" -- ";
+		logger.log(level, toAppend + " " + message);
 	}
 		
 }

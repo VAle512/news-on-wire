@@ -3,7 +3,6 @@ package it.uniroma3.newswire.crawling;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_DEPTH;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_NUM_CRAWLERS;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_STORAGE;
-import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_RESET_ALL;
 import static it.uniroma3.newswire.utils.EnvironmentVariables.envConfig;
 
 import java.io.File;
@@ -18,10 +17,8 @@ import edu.uci.ics.crawler4j.fetcher.PageFetcher;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtConfig;
 import edu.uci.ics.crawler4j.robotstxt.RobotstxtServer;
 import it.uniroma3.newswire.persistence.ConcurrentPersister;
-import it.uniroma3.newswire.persistence.DAO;
 import it.uniroma3.newswire.persistence.DAOPool;
 import it.uniroma3.newswire.properties.PropertiesReader;
-import it.uniroma3.newswire.utils.EnvironmentVariables;
 import it.uniroma3.newswire.utils.URLUtils;
 
 /**
@@ -81,7 +78,7 @@ public class CrawlingDriver {
 		
 		logger.info("Starting crawler...");
 		
-		controller.start(() -> new Crawler(concPersister), 32);
+		controller.start(() -> new Crawler(concPersister), NUM_CRAWLERS);
 		
 		/* Shutdown the current crawling session */
 		if(controller.isFinished()) // Should be blocking in case of Non-Blocking crawling
