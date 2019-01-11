@@ -16,11 +16,11 @@ import it.uniroma3.newswire.persistence.DAOPool;
 public class PageSaver {
 	private static final Logger logger = Logger.getLogger(PageSaver.class);
 
-	public static void savePageOnFileSystem(Page page) {
+	public static String savePageOnFileSystem(Page page) {
 		int currentSnapshot = DAOPool.getInstance().getDAO(URLUtils.domainOf(page.getWebURL().getURL())).getCurrentSequence();
 		
 		if (!(page.getParseData() instanceof HtmlParseData))
-			return;
+			return null;
 		
 		HtmlParseData htmlParseData = (HtmlParseData) page.getParseData();
 		String url = URLUtils.canonicalize(page.getWebURL().getURL());
@@ -45,5 +45,7 @@ public class PageSaver {
 		} catch (IOException e) {
 			logger.info(e.getMessage());
 		}
+		
+		return f.getAbsolutePath();
 	}
 }

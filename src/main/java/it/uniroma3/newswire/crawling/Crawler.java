@@ -26,7 +26,7 @@ import it.uniroma3.newswire.persistence.ConcurrentPersister;
 import it.uniroma3.newswire.properties.PropertiesReader;
 import it.uniroma3.newswire.utils.PageSaver;
 import it.uniroma3.newswire.utils.URLUtils;
-import scala.Tuple4;
+import scala.Tuple6;
 
 /**
  * This class represents the crawler effectively doing the job.
@@ -94,11 +94,13 @@ public class Crawler extends WebCrawler {
 			
 		/* If needed download the page too. */
 		//TODO: I/O, maybe better to remove it?
+		String fileName = "";
 		if(isPersistEnabled) {
 //			new Thread(() ->  {
-				PageSaver.savePageOnFileSystem(page);
+				fileName = PageSaver.savePageOnFileSystem(page);
 //			});
 		}
+		final String finalFileName = fileName;
 		
 		/* This is done due to get the XPath of the links in the current page in the next steps. */
 		Document doc = Jsoup.parse(Jsoup.clean(htmlParseData.getHtml(),"http://" + domain, Whitelist.relaxed().addTags("img").preserveRelativeLinks(true).removeTags("script")));
@@ -140,13 +142,14 @@ public class Crawler extends WebCrawler {
 								String href = webUrl.getPath();
 								String absolute = canonicalize(webUrl.getURL());
 								String referringPage = canonicalize(page.getWebURL().getURL());
+								int depth = page.getWebURL().getDepth();
 								
 								xpaths.forEach(xpath -> {
 									if(!xpath.matches(".+\\/a\\[\\d+\\]"))
 										return;
 									if(xpath != null)
 										// Adjusted
-										this.persister.addToQueue(new Tuple4<>(absolute, referringPage, href, xpath));
+										this.persister.addToQueue(new Tuple6<>(absolute, referringPage, href, xpath, depth, finalFileName));
 									
 									//DAOPool.getInstance().getDAO(domaninForDAO).insertLinkOccourrence(connection, absolute, referringPage, href, xpath);
 								});

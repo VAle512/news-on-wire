@@ -10,6 +10,10 @@ import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referrin
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.relative;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.snapshot;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.depth;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.file;
+
+
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_DB_URL_PLACEHOLDER;
 
 import java.io.Serializable;
@@ -85,9 +89,11 @@ public abstract class Feature implements Serializable {
 			  	   							.map(row -> new Document().append(id.name(), 				row.getLong(id.ordinal()))
 			  	   													  .append(link.name(), 				row.getString(link.ordinal()))
 			  	   													  .append(referringPage.name(), 	row.getString(referringPage.ordinal()))
-			  	   										              .append(relative.name(), 			row.getString(relative.ordinal()))
+			  	   										              .append(relative.name(), 		row.getString(relative.ordinal()))
 			  	   										              .append(xpath.name(), 			row.getString(xpath.ordinal()))
-			  	   										              .append(snapshot.name(), 			row.getInt(snapshot.ordinal()))
+			  	   										              .append(snapshot.name(), 		row.getInt(snapshot.ordinal()))
+			  	   										              .append(depth.name(), 			row.getInt(depth.ordinal()))
+			  	   										              .append(file.name(), 				row.getString(file.ordinal()))
 			  	   										              .append(date.name(), 				row.getTimestamp(date.ordinal())))
 			  	   							.cache();
 		

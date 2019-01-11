@@ -19,6 +19,7 @@ import it.uniroma3.newswire.utils.URLUtils;
 import me.tongfei.progressbar.ProgressBar;
 import me.tongfei.progressbar.ProgressBarStyle;
 import scala.Tuple4;
+import scala.Tuple6;
 
 /**
  * This class models a concurrent persister. 
@@ -35,7 +36,7 @@ public class ConcurrentPersister extends Thread{
 	private static final int BATCH_SIZE = Integer.parseInt(propsReader.getProperty(CRAWLER_PERSISTENCE_BATCH_SIZE));
 	private static final int THREAD_COUNT = Integer.parseInt(propsReader.getProperty(CRAWLER_PERSISTENCE_THREAD_COUNT));
 	private static final long WAITING_TIMEOUT_MILLIS = 150000;
-	private Map<DAO, BlockingQueue<Tuple4<String, String, String, String>>> dao2queue;
+	private Map<DAO, BlockingQueue<Tuple6<String, String, String, String, Integer, String>>> dao2queue;
 	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
 	
 
@@ -50,7 +51,7 @@ public class ConcurrentPersister extends Thread{
 	 * Queues a tuple to be persisted in the future.
 	 * @param tuple is the tuple we want to persist.
 	 */
-	public void addToQueue(Tuple4<String, String, String, String> tuple) {
+	public void addToQueue(Tuple6<String, String, String, String, Integer, String> tuple) {
 		String absoluteURL = tuple._1();
 		String dbName = URLUtils.domainOf(absoluteURL);
 		
@@ -58,7 +59,7 @@ public class ConcurrentPersister extends Thread{
 		
 		/* If we don't have a queue for the specified database let's create it. */
 		if(!this.dao2queue.containsKey(dao)) {
-			BlockingQueue<Tuple4<String, String, String, String>> queueToPut = new LinkedBlockingQueue<>();			
+			BlockingQueue<Tuple6<String, String, String, String, Integer, String>> queueToPut = new LinkedBlockingQueue<>();			
 			this.dao2queue.put(dao, queueToPut);
 		}
 		
@@ -125,7 +126,7 @@ public class ConcurrentPersister extends Thread{
 	public void persistBatch() {
 		
 		DAO dao = null;
-		List<Tuple4<String, String, String, String>> toProcess = new ArrayList<>();
+		List<Tuple6<String, String, String, String, Integer, String>> toProcess = new ArrayList<>();
 
 		synchronized(this.dao2queue) {
 			dao = this.retrieveEligibleQueue();

@@ -70,7 +70,7 @@ public class DAOPool {
 			
 			if(!exists) {
 				logger.info("Prevented erasing.");
-				System.exit(0);
+				//System.exit(0);
 				createDB(dbName);
 			}
 			

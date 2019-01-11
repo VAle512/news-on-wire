@@ -118,7 +118,12 @@ public class CLI {
 
 private static void showChoices() throws IOException {
 	init(false);
-	int latestSnapshot = DAOPool.getInstance().getDatabasesDAOs().get(0).getCurrentSequence();
+	int latestSnapshot = 0;
+	try {
+		latestSnapshot = DAOPool.getInstance().getDatabasesDAOs().get(0).getCurrentSequence();
+	} catch (Exception e) {
+		//probably ArrayOOB
+	}
 
 	System.out.println("Press the number corresponding to your choice:");
 	System.out.println("\t1. Execute the entire benchmark suite for the latest snapshot: " + latestSnapshot);

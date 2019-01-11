@@ -1,6 +1,8 @@
 package it.uniroma3.newswire.persistence;
 
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.date;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.depth;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.file;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.link;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referringPage;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.relative;
@@ -43,10 +45,12 @@ import it.uniroma3.newswire.benchmark.BenchmarkResult;
 import it.uniroma3.newswire.classification.features.PageHyperTextualReferencesDinamicity;
 import it.uniroma3.newswire.classification.features.HyperTextualContentDinamycityPlusStability;
 import it.uniroma3.newswire.classification.features.Stability;
+import it.uniroma3.newswire.persistence.schemas.LinkOccourrences;
 import it.uniroma3.newswire.properties.PropertiesReader;
 import it.uniroma3.newswire.utils.xpath.XPath;
 import scala.Tuple2;
 import scala.Tuple4;
+import scala.Tuple6;
 
 /**
  * This class is an interface to the MySQL relational database in which are stored all the informations
@@ -155,6 +159,7 @@ public class DAO implements Serializable{
 			}
 			
 			/* ...and then (re)create it. */
+			//XXX: Aggiungere Depth e Pathinse
 			String createTableQuery = "CREATE TABLE " + LINK_OCCURRENCES_TABLE + " (id bigint AUTO_INCREMENT, "
 																			   +   "link varchar(2083) NOT NULL, "
 																			   +   "referringPage varchar(2083) NOT NULL, "
@@ -162,6 +167,8 @@ public class DAO implements Serializable{
 																			   +   "xpath varchar(2083), "
 																			   +   "snapshot int NOT NULL, "
 																			   +   "date Timestamp, "
+																			   +   "depth int NOT NULL,"
+																			   +   "file varchar(2083),"
 																			   +   "PRIMARY KEY(id))";
 			statement.execute(createTableQuery);
 			
@@ -476,7 +483,8 @@ public class DAO implements Serializable{
 	 * @param xpathToInsert is the position where we found this link.
 	 */
 	//TODO: Cambiare in bigInt l'autoincrement e poi pushare.
-	public void insertLinkOccourrence(Connection connection, String linkToInsert, String referringPageToInsert, String relativeToInsert, String xpathToInsert) {
+	//XXX: Aggiungere Depth e Path
+	public void insertLinkOccourrence(Connection connection, String linkToInsert, String referringPageToInsert, String relativeToInsert, String xpathToInsert, int depth, String stored) {
 		Statement statement = null;
 		PreparedStatement pstat = null;
 		
@@ -501,7 +509,7 @@ public class DAO implements Serializable{
 			
 		    Timestamp sqlDate = new Timestamp(new java.util.Date().getTime());
 		    
-		    String insertLinkOccurrenceQuery = "INSERT INTO " + LINK_OCCURRENCES_TABLE + "(link, referringPage, relativeLink, xpath, snapshot, date) values(?,?,?,?,?,?)";	    
+		    String insertLinkOccurrenceQuery = "INSERT INTO " + LINK_OCCURRENCES_TABLE + "(link, referringPage, relativeLink, xpath, snapshot, depth, file, date) values(?,?,?,?,?,?,?,?)";	    
 		    
 		    pstat = connection.prepareStatement(insertLinkOccurrenceQuery);
 		    
@@ -510,6 +518,8 @@ public class DAO implements Serializable{
 		    pstat.setString(relative.ordinal(), relativeToInsert);
 		    pstat.setString(xpath.ordinal(), xpathToInsert);
 		    pstat.setInt(snapshot.ordinal(), currentSnapshot);
+		    pstat.setInt(LinkOccourrences.depth.ordinal(), depth);
+		    pstat.setString(file.ordinal(), stored);
 		    pstat.setTimestamp(date.ordinal(), sqlDate);  
 		    pstat.executeUpdate();
 			   
@@ -530,21 +540,23 @@ public class DAO implements Serializable{
 	 * @param relativeToInsert is the relative URL of the link we are adding the occurrence for.
 	 * @param xpathToInsert is the position where we found this link.
 	 */
-	public void insertLinkOccourrencesBatch(List<Tuple4<String, String, String, String>> batch) {
+	public void insertLinkOccourrencesBatch(List<Tuple6<String, String, String, String, Integer, String>> batch) {
 		PreparedStatement pstat = null;
 		Connection connection = this.getConnection();
 		
 		try {
 			/* Retrieve the current snapshot counter. */
 			int currentSnapshot = this.getCurrentSequence();
-		    String insertLinkOccurrenceQuery = "INSERT INTO " + LINK_OCCURRENCES_TABLE + "(link, referringPage, relativeLink, xpath, snapshot, date) values(?,?,?,?,?,?)";	    
+		    String insertLinkOccurrenceQuery = "INSERT INTO " + LINK_OCCURRENCES_TABLE + "(link, referringPage, relativeLink, xpath, snapshot,depth, file, date) values(?,?,?,?,?,?,?,?)";	    
 		    pstat = connection.prepareStatement(insertLinkOccurrenceQuery);
 
-			for(Tuple4<String, String, String, String> fourth: batch) {
-				String linkToInsert = fourth._1();
-				String referringPageToInsert = fourth._2();
-				String relativeToInsert = fourth._3();
-				String xpathToInsert = fourth._4();
+			for(Tuple6<String, String, String, String, Integer, String> sixth: batch) {
+				String linkToInsert = sixth._1();
+				String referringPageToInsert = sixth._2();
+				String relativeToInsert = sixth._3();
+				String xpathToInsert = sixth._4();
+				int depth = sixth._5();
+				String file = sixth._6();
 				
 				/* If xpath's null it's useless */
 				if(xpathToInsert==null) 
@@ -558,6 +570,8 @@ public class DAO implements Serializable{
 			    pstat.setString(relative.ordinal(), relativeToInsert);
 			    pstat.setString(xpath.ordinal(), xpathToInsert);
 			    pstat.setInt(snapshot.ordinal(), currentSnapshot);
+			    pstat.setInt(LinkOccourrences.depth.ordinal(), depth);
+			    pstat.setString(LinkOccourrences.file.ordinal(), file);
 			    pstat.setTimestamp(date.ordinal(), sqlDate);  
 			    pstat.addBatch();
 			}

@@ -38,9 +38,9 @@ public class Init {
 		boolean useCLI = Boolean.parseBoolean(System.getProperty(USE_CLI_PROPERTY));
 		
 //		if(forceCrawlOnly)
-//			doCrawl();
+			doCrawl();
 //		else if (useCLI)
-		showCLI();
+//		showCLI();
 		
 		
 	}
@@ -53,7 +53,7 @@ public class Init {
 //		boolean resetAll = Boolean.parseBoolean(propsReader.getProperty(MYSQL_RESET_ALL));
 		/* Never erase anything resume everytime */
 		
-		checkGoldens();
+		//checkGoldens();
 		
 		init(resetAll);
 		
