@@ -48,4 +48,10 @@ public class PageSaver {
 		
 		return f.getAbsolutePath();
 	}
+	
+	public static String calculateFileName(String absolutePath) {
+		int currentSnapshot = DAOPool.getInstance().getDAO(URLUtils.domainOf(absolutePath)).getCurrentSequence();
+		String fileName = System.getenv(envData) + File.separator + absolutePath.replace("http://", "") + (absolutePath.endsWith("/") ? "index.html" : "") + "." + currentSnapshot;
+		return fileName;
+	}
 }

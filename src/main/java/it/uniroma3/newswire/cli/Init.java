@@ -48,7 +48,7 @@ public class Init {
 	@SuppressWarnings("static-access")
 	private static void doCrawl() throws Exception {
 		logger.info("Crawling started...");
-		boolean resetAll = false;
+		boolean resetAll = true;
 		/* Personal protection. */
 //		boolean resetAll = Boolean.parseBoolean(propsReader.getProperty(MYSQL_RESET_ALL));
 		/* Never erase anything resume everytime */

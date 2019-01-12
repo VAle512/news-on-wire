@@ -1,9 +1,11 @@
 package it.uniroma3.newswire.crawling;
 
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_EXCLUDE_LIST;
+import static it.uniroma3.newswire.utils.EnvironmentVariables.envData;
 import static it.uniroma3.newswire.utils.URLUtils.canonicalize;
 import static org.joox.JOOX.$;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +25,9 @@ import edu.uci.ics.crawler4j.frontier.DocIDServer;
 import edu.uci.ics.crawler4j.parser.HtmlParseData;
 import edu.uci.ics.crawler4j.url.WebURL;
 import it.uniroma3.newswire.persistence.ConcurrentPersister;
+import it.uniroma3.newswire.persistence.DAOPool;
 import it.uniroma3.newswire.properties.PropertiesReader;
+import it.uniroma3.newswire.utils.EnvironmentVariables;
 import it.uniroma3.newswire.utils.PageSaver;
 import it.uniroma3.newswire.utils.URLUtils;
 import scala.Tuple6;
@@ -94,13 +98,12 @@ public class Crawler extends WebCrawler {
 			
 		/* If needed download the page too. */
 		//TODO: I/O, maybe better to remove it?
-		String fileName = "";
+		
 		if(isPersistEnabled) {
 //			new Thread(() ->  {
-				fileName = PageSaver.savePageOnFileSystem(page);
+				PageSaver.savePageOnFileSystem(page);
 //			});
 		}
-		final String finalFileName = fileName;
 		
 		/* This is done due to get the XPath of the links in the current page in the next steps. */
 		Document doc = Jsoup.parse(Jsoup.clean(htmlParseData.getHtml(),"http://" + domain, Whitelist.relaxed().addTags("img").preserveRelativeLinks(true).removeTags("script")));
@@ -147,10 +150,11 @@ public class Crawler extends WebCrawler {
 								xpaths.forEach(xpath -> {
 									if(!xpath.matches(".+\\/a\\[\\d+\\]"))
 										return;
-									if(xpath != null)
+									if(xpath != null) {
 										// Adjusted
-										this.persister.addToQueue(new Tuple6<>(absolute, referringPage, href, xpath, depth, finalFileName));
-									
+										String fileName = PageSaver.calculateFileName(absolute);
+										this.persister.addToQueue(new Tuple6<>(absolute, referringPage, href, xpath, depth, fileName));
+									}
 									//DAOPool.getInstance().getDAO(domaninForDAO).insertLinkOccourrence(connection, absolute, referringPage, href, xpath);
 								});
 								
