@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -38,6 +39,7 @@ public class ConcurrentPersister extends Thread{
 	private static final long WAITING_TIMEOUT_MILLIS = 150000;
 	private Map<DAO, BlockingQueue<Tuple6<String, String, String, String, Integer, String>>> dao2queue;
 	private ExecutorService executor = Executors.newFixedThreadPool(THREAD_COUNT);
+	private boolean crawlingEnded = false;
 	
 
 	/**
@@ -52,8 +54,10 @@ public class ConcurrentPersister extends Thread{
 	 * @param tuple is the tuple we want to persist.
 	 */
 	public void addToQueue(Tuple6<String, String, String, String, Integer, String> tuple) {
+				
+
 		String absoluteURL = tuple._1();
-		String dbName = URLUtils.domainOf(absoluteURL);
+		String dbName = URLUtils.getDatabaseNameOf(absoluteURL);
 		
 		DAO dao = DAOPool.getInstance().getDAO(dbName);
 		
@@ -74,37 +78,64 @@ public class ConcurrentPersister extends Thread{
 			synchronized(this) {
 				this.notify();
 			}
-				
 	}
 
 	/* (non-Javadoc)
 	 * @see java.lang.Thread#run()
 	 */
 	public void run() {
-		try(ProgressBar pb = new ProgressBar("Persiting data", 0, ProgressBarStyle.UNICODE_BLOCK)) {
+		try(ProgressBar pb = new ProgressBar("Persisting data", 0, ProgressBarStyle.UNICODE_BLOCK)) {
 			/* Trickage */
 			if(this.progressBar == null)
 				this.progressBar = pb;
 			
-			while(true) {
+			while(true && !this.crawlingEnded) {
 				/* Check if there is at least one queue long enough .*/
-				while(!existsEligibleQueue()) {
+				while(!existsEligibleQueue() && !this.crawlingEnded) {
 					synchronized(this) {
 						try {
 							/* Wait until there is a queue that is long enough. But to be sure, check every minute. */
-							this.wait(WAITING_TIMEOUT_MILLIS);
+						this.wait(WAITING_TIMEOUT_MILLIS);
+							
 						} catch (InterruptedException e) {
 							logger.error(e.getMessage());
 						}
 					}
 				}
-				
+
 				/* If there is, ask to another thread to do the job */
-				executor.execute(() -> persistBatch());
+				if(this.crawlingEnded)
+					completeRemaining();
+				else 
+					executor.execute(() -> persistBatch());
 			}
 		}
 	}
 	
+	private void completeRemaining() {
+		for(DAO dao: this.dao2queue.keySet()) {
+			List<Tuple6<String, String, String, String, Integer, String>> toProcess = new ArrayList<>();
+			
+			synchronized(this) {
+				while(!this.dao2queue.get(dao).isEmpty()) {
+					if(toProcess.size() < BATCH_SIZE) {
+						if(!toProcess.add(this.dao2queue.get(dao).poll()))
+							logger.error("Error polling value from queue of " + dao.getDatabaseName());
+					} else {
+						dao.insertLinkOccourrencesBatch(toProcess);
+						this.progressBar.stepBy(toProcess.size());
+					}
+				}
+				
+				if(!toProcess.isEmpty()) {
+					dao.insertLinkOccourrencesBatch(toProcess);
+					this.progressBar.stepBy(toProcess.size());
+				}
+		
+			}
+		}	
+	}
+
 	/**
 	 * Retrieves and returns the queue that has a size of at least BATCH_SIZE.
 	 * @return the queue.
@@ -112,7 +143,8 @@ public class ConcurrentPersister extends Thread{
 	private DAO retrieveEligibleQueue() {
 		for(DAO dao: this.dao2queue.keySet())
 			if(this.dao2queue.get(dao).size() >= BATCH_SIZE)
-				return dao;	
+				return dao;
+			
 		return null;
 	}
 	
@@ -146,5 +178,12 @@ public class ConcurrentPersister extends Thread{
 		
 		/* Increase the counter of BATCH_SIZE once the task has completed. */
 		this.progressBar.stepBy(BATCH_SIZE);
+	}
+	
+	public void crawlingEnded() {
+		this.crawlingEnded = true;
+		synchronized(this) {
+			this.notify();
+		}
 	}
 }

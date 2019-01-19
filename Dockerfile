@@ -21,7 +21,8 @@ ENV CONFIG_FOLDER=/app/config
 ENV DATA_FOLDER=/app/data
 ENV GOLDENS_FOLDER=/app/goldens
 ENV DEBUG_FOLDER=/app/debug
-# ENV MODELS_FOLDER=/app/models
+ENV DATASETS_FOLDER=/app/csv
+ENV RESULTS_FOLDER=/app/results
 	
 WORKDIR target
 EXPOSE 4040

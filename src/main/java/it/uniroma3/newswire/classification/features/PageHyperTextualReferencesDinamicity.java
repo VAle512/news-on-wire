@@ -15,6 +15,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
 import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.storage.StorageLevel;
 import org.neo4j.driver.internal.util.Iterables;
 
 import com.google.common.collect.Lists;
@@ -51,6 +52,13 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 	@SuppressWarnings("unchecked")
 	public JavaPairRDD<String, Double> calculate(boolean persistResults, int untilSnapshot) {
 		log(INFO, "started");
+		
+		JavaPairRDD<String, Double> cached = loadCachedData();
+		if(cached !=null)
+			if(cached.count() != 0) {
+			log(INFO, "Data in cache loaded susccessfully: " + cached.count());
+			return cached.cache();
+		}
 		
 		/* Erase previous Stability Data */
 		if(persistResults)
@@ -159,13 +167,19 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 									  							long differences = Iterables.asList(x._2).stream().mapToLong(y -> y._2).sum();
 									  							return new Tuple2<>(x._1, differences);
 									  						})
-									  						.mapToPair(tuple -> new Tuple2<>(tuple._1, new Double(tuple._2)));
+									  						.mapToPair(tuple -> new Tuple2<>(tuple._1, new Double(tuple._2)))
+									  						.persist(StorageLevel.MEMORY_ONLY_SER());;
+		
+		//collectionMovement = collectionMovement.filter(x -> !x._1.equals("http://www.nytimes.com/events/"));
+		
 		//DEPRECATED: For normalization
 		double maxValue = collectionMovement.mapToDouble(x -> x._2).max();
-
-
+		double minValue = collectionMovement.mapToDouble(x -> x._2).min();
+		
+		JavaPairRDD<String, Double> normalization = collectionMovement.mapToPair(x -> new Tuple2<>(x._1, minMaxNormOf(x._2, minValue, maxValue)));
+		
 		if(persistResults) {
-			persist(collectionMovement.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue)));
+			persist(collectionMovement);
 		}
 		
 		log(INFO, "ended.");
@@ -173,7 +187,7 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 		
 		//TODO: Bisogna capire come fare a far tornare un valore nell'intervallo 0-1 e ad utilizzarlo nelle analisi combinate.
 		//return collectionMovement.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue));
-		return collectionMovement.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue));
+		return collectionMovement;
 	}
 	
 	/**
@@ -213,6 +227,10 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 	
 	private double sigmoidOf(Long n) {
 		return 1 / (1 + Math.exp(-n));
+	}
+	
+	private double minMaxNormOf(Double n, Double min, Double max) {
+		return (double) (n - min) / (double) (max - min);
 	}
 		
 }

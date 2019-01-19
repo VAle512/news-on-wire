@@ -1,13 +1,13 @@
 package it.uniroma3.newswire.crawling;
 
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_EXCLUDE_LIST;
-import static it.uniroma3.newswire.utils.EnvironmentVariables.envData;
 import static it.uniroma3.newswire.utils.URLUtils.canonicalize;
 import static org.joox.JOOX.$;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -25,11 +25,10 @@ import edu.uci.ics.crawler4j.frontier.DocIDServer;
 import edu.uci.ics.crawler4j.parser.HtmlParseData;
 import edu.uci.ics.crawler4j.url.WebURL;
 import it.uniroma3.newswire.persistence.ConcurrentPersister;
-import it.uniroma3.newswire.persistence.DAOPool;
 import it.uniroma3.newswire.properties.PropertiesReader;
-import it.uniroma3.newswire.utils.EnvironmentVariables;
 import it.uniroma3.newswire.utils.PageSaver;
 import it.uniroma3.newswire.utils.URLUtils;
+import scala.Tuple2;
 import scala.Tuple6;
 
 /**
@@ -44,6 +43,10 @@ public class Crawler extends WebCrawler {
 	private static final PropertiesReader propsReader = PropertiesReader.getInstance();
 	private final static Pattern FILE_FILTERS = Pattern.compile(".*(\\.(" + propsReader.getProperty(CRAWLER_EXCLUDE_LIST).replaceAll(",", "|") + "))$");
 	private final static boolean isPersistEnabled = true;
+	private Set<String> oldUrls;
+	private Set<String> freshUrls;
+	private Set<String> justUrls;
+	
 	private ConcurrentPersister persister;
 	/* (non-Javadoc)
 	 * @see edu.uci.ics.crawler4j.crawler.WebCrawler#shouldVisit(edu.uci.ics.crawler4j.crawler.Page, edu.uci.ics.crawler4j.url.WebURL)
@@ -57,6 +60,14 @@ public class Crawler extends WebCrawler {
 	
 	public Crawler(ConcurrentPersister persister) {
 		this.persister = persister;
+		this.justUrls = new HashSet<>();
+	}
+	
+	public Crawler(ConcurrentPersister persister, Set<String> oldURls) {
+		this.persister = persister;
+		this.oldUrls = oldURls;
+		this.freshUrls = new HashSet<>();
+		this.justUrls = new HashSet<>();
 	}
 	
 //	@Override
@@ -100,7 +111,7 @@ public class Crawler extends WebCrawler {
 		//TODO: I/O, maybe better to remove it?
 		
 		if(isPersistEnabled) {
-//			new Thread(() ->  {
+			if(!(new File(PageSaver.calculateFileName(page.getWebURL().getURL())).exists()))
 				PageSaver.savePageOnFileSystem(page);
 //			});
 		}
@@ -117,9 +128,9 @@ public class Crawler extends WebCrawler {
 		org.w3c.dom.Document document = $(doc.html()).document();
 		Set<WebURL> outgoingLinks = htmlParseData.getOutgoingUrls();
 			
-		String domaninForDAO = URLUtils.domainOf(page.getWebURL().getURL());
+		String domaninForDAO = URLUtils.getDatabaseNameOf(page.getWebURL().getURL());
 //		Connection connection = DAOPool.getInstance().getDAO(domaninForDAO).getConnection();
-		
+//		System.out.println("Links found: " + outgoingLinks.size());
 		outgoingLinks.stream()
 					 .filter(x -> x != null)
 					 .filter(x -> {
@@ -153,7 +164,16 @@ public class Crawler extends WebCrawler {
 									if(xpath != null) {
 										// Adjusted
 										String fileName = PageSaver.calculateFileName(absolute);
+										
+										if(this.oldUrls != null) {
+											if(!this.oldUrls.contains(absolute))
+												this.freshUrls.add(absolute);
+										}
+										
+										this.justUrls.add(absolute);
+										
 										this.persister.addToQueue(new Tuple6<>(absolute, referringPage, href, xpath, depth, fileName));
+										
 									}
 									//DAOPool.getInstance().getDAO(domaninForDAO).insertLinkOccourrence(connection, absolute, referringPage, href, xpath);
 								});
@@ -168,6 +188,11 @@ public class Crawler extends WebCrawler {
 //			}
 			long inTime = System.currentTimeMillis() - startTime;
 			logger.info("Number of outgoing links fetched: " +  outgoingLinks.size() + " -- in " + inTime + " ms.");
+	}
+	
+	@Override
+	public Object getMyLocalData() {
+		return new Tuple2<>(this.freshUrls, this.justUrls);
 	}
 	
 	private boolean shouldBeVisited(String url, String domain) {

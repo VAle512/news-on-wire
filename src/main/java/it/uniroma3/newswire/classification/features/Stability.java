@@ -7,6 +7,7 @@ import static org.apache.log4j.Level.INFO;
 import org.apache.log4j.Level;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.storage.StorageLevel;
 import org.bson.Document;
 import org.neo4j.driver.internal.util.Iterables;
 
@@ -34,13 +35,21 @@ public class Stability extends Feature {
 	public JavaPairRDD<String, Double> calculate(boolean persistResults, int untilSnapshot) {
 		log(INFO, "started");
 		/* Erase previous Stability Data */
+		
+		JavaPairRDD<String, Double> cached = loadCachedData();
+		if(cached !=null)
+			if(cached.count() != 0) {
+			log(INFO, "Data in cache loaded susccessfully: " + cached.count());
+			return cached.cache();
+		}
+		
 		if(persistResults)
 			erasePreviousBenchmarkData(persistResults);
 
 		JavaRDD<Document> rdd = loadData();
 		
 		if(untilSnapshot > 0)
-			rdd = rdd.filter(x -> x.getInteger(snapshot.name()) <= untilSnapshot).cache();
+			rdd = rdd.filter(x -> x.getInteger(snapshot.name()) <= untilSnapshot);
 		
 		/* Retrieve the current snapshot counter */
 		//int latestSnapshot = DAOPool.getInstance().getDAO(this.database).getCurrentSequence();
@@ -56,8 +65,8 @@ public class Stability extends Feature {
 											  
 											    /* divide the number of snapshots a URL is crawled in by the total number of snapshots taken. */
 											    .mapToPair(group -> new Tuple2<>(group._1 , 
-													  							(double) Iterables.asList(group._2).size() / (double) untilSnapshot));
-		
+													  							(double) Iterables.asList(group._2).size() / (double) untilSnapshot))
+											    .persist(StorageLevel.MEMORY_ONLY_SER());
 		
 	   /* Persisting results into the DB. */
 	   if(persistResults) {

@@ -17,7 +17,7 @@ public class PageSaver {
 	private static final Logger logger = Logger.getLogger(PageSaver.class);
 
 	public static String savePageOnFileSystem(Page page) {
-		int currentSnapshot = DAOPool.getInstance().getDAO(URLUtils.domainOf(page.getWebURL().getURL())).getCurrentSequence();
+		int currentSnapshot = DAOPool.getInstance().getDAO(URLUtils.getDatabaseNameOf(page.getWebURL().getURL())).getCurrentSequence();
 		
 		if (!(page.getParseData() instanceof HtmlParseData))
 			return null;
@@ -43,14 +43,14 @@ public class PageSaver {
 			f.createNewFile();
 			Files.write(htmlParseData.getHtml(), f, StandardCharsets.UTF_8);
 		} catch (IOException e) {
-			logger.info(e.getMessage());
+			System.out.println(e.getMessage());
 		}
 		
 		return f.getAbsolutePath();
 	}
 	
 	public static String calculateFileName(String absolutePath) {
-		int currentSnapshot = DAOPool.getInstance().getDAO(URLUtils.domainOf(absolutePath)).getCurrentSequence();
+		int currentSnapshot = DAOPool.getInstance().getDAO(URLUtils.getDatabaseNameOf(absolutePath)).getCurrentSequence();
 		String fileName = System.getenv(envData) + File.separator + absolutePath.replace("http://", "") + (absolutePath.endsWith("/") ? "index.html" : "") + "." + currentSnapshot;
 		return fileName;
 	}

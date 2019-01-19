@@ -12,7 +12,7 @@ import edu.uci.ics.crawler4j.url.URLCanonicalizer;
 public class URLUtils {
 	private static Logger logger = Logger.getLogger(URLUtils.class);
 	
-	public static String domainOf(String url) {
+	public static String getDatabaseNameOf(String url) {
 		Pattern dbNamePattern = Pattern.compile("^(?:https?:\\/\\/)?(?:[^@\\/\\n]+@)?(?:www\\.)?([^:\\/?\\n]+)");
 		 Matcher matcher = dbNamePattern.matcher(url);
 		 if(matcher.find())

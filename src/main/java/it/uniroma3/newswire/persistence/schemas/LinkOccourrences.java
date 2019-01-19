@@ -7,7 +7,7 @@ public enum LinkOccourrences {
 	relative,
 	xpath,
 	snapshot,
+	date,
 	depth,
-	file,
-	date
+	file
 }

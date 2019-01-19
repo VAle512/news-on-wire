@@ -28,6 +28,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -547,7 +548,7 @@ public class DAO implements Serializable{
 		try {
 			/* Retrieve the current snapshot counter. */
 			int currentSnapshot = this.getCurrentSequence();
-		    String insertLinkOccurrenceQuery = "INSERT INTO " + LINK_OCCURRENCES_TABLE + "(link, referringPage, relativeLink, xpath, snapshot,depth, file, date) values(?,?,?,?,?,?,?,?)";	    
+		    String insertLinkOccurrenceQuery = "INSERT INTO " + LINK_OCCURRENCES_TABLE + "(link, referringPage, relativeLink, xpath, snapshot, date, depth, file) values(?,?,?,?,?,?,?,?)";	    
 		    pstat = connection.prepareStatement(insertLinkOccurrenceQuery);
 
 			for(Tuple6<String, String, String, String, Integer, String> sixth: batch) {
@@ -582,6 +583,7 @@ public class DAO implements Serializable{
 		} catch (SQLException e) {
 			/* Reduce logging. */
 			log(ERROR,e.getMessage());
+			e.printStackTrace();
 		}finally {
 			clearResources(connection, null, pstat, null);
 		}
@@ -641,6 +643,7 @@ public class DAO implements Serializable{
 			statement.executeUpdate("DELETE FROM " + tableName + " WHERE 1");
 			
 			check = statement.executeQuery("SELECT * FROM " + tableName);
+			
 			if(check.next())
 				log(ERROR,"Something went wrong dropping table: " + tableName);
 			else
@@ -846,5 +849,35 @@ public class DAO implements Serializable{
 		}finally {
 			clearResources(connection, stmnt, null, null);
 		}
+	}
+	
+	/*
+	 * Still in testing.
+	 */
+	public Set<String> getURLs(int depth, int snapshot) {
+		Statement statement = null;
+		ResultSet result = null;
+		Connection connection = getConnection();
+		Set<String> urls = new HashSet<>();
+		try {
+			depth = depth + 1;
+			System.out.println("SELECT link FROM " + LINK_OCCURRENCES_TABLE + " WHERE depth <= " + depth + " AND snapshot = " + snapshot);
+			String  insertResultPrepared = "SELECT link FROM " + LINK_OCCURRENCES_TABLE + " WHERE depth <= " + depth + " AND snapshot = " + snapshot;
+			statement = connection.createStatement();
+			result = statement.executeQuery(insertResultPrepared);	
+			
+			while(result.next()) {
+				urls.add(result.getString("link"));
+			}
+			
+			} catch (SQLException e1) {
+				log(ERROR,e1.getMessage());
+				return urls;
+			
+			} finally {
+				clearResources(connection, statement, null, result);
+			}
+		System.out.println(urls);
+		return urls;
 	}
 }

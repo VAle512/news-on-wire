@@ -3,6 +3,7 @@ package it.uniroma3.newswire.classification.features;
 import static org.apache.log4j.Level.INFO;
 
 import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.storage.StorageLevel;
 
 import scala.Tuple2;
 
@@ -30,7 +31,14 @@ public class HyperTextualContentDinamycityPlusStability extends Feature{
 	 */
 	public JavaPairRDD<String, Double> calculate(boolean persistResults, int untilSnapshot) {
 		log(INFO, "started");
-
+		
+		JavaPairRDD<String, Double> cached = loadCachedData();
+		if(cached !=null)
+			if(cached.count() != 0) {
+			log(INFO, "Data in cache loaded susccessfully: " + cached.count());
+			return cached.cache();
+		}
+		
 		this.hyperTextualContentDinamycityRDD = (new PageHyperTextualReferencesDinamicity(this.database)).calculate(persistResults, untilSnapshot);
 		
 		this.stabilityRDD = (new Stability(this.database)).calculate(persistResults, untilSnapshot);
@@ -47,7 +55,7 @@ public class HyperTextualContentDinamycityPlusStability extends Feature{
 					   										   double score = 1 / (1 + Math.exp(-linkDinamicity)) - (linkStability/2.);
 					   										   score = (score < 0.) ? 0. : score;
 					   										   return new Tuple2<String, Double>(link._1, score);
-					   									   });
+					   									   }).persist(StorageLevel.MEMORY_ONLY_SER());
 		/* Persist result on the DB. */
 		if(persistResults) {
 			persist(combined);

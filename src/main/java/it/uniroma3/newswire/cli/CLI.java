@@ -10,10 +10,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import it.uniroma3.newswire.benchmark.BenchmarkDriver;
-import it.uniroma3.newswire.classification.ThreeMeans;
+import it.uniroma3.newswire.classification.Clusterer;
 import it.uniroma3.newswire.persistence.DAO;
 import it.uniroma3.newswire.persistence.DAOPool;
 
+/**
+ * Command Line Interface
+ * @author luigi
+ *
+ */
 public class CLI {
 	public static void showCLI() throws Exception {
 		Scanner scanner = new Scanner(System.in);
@@ -103,7 +108,7 @@ public class CLI {
 				System.out.println("Please insert the snapshot you want to execute the benchmark suite for:");
 				int snapshot = scanner.nextInt();
 				
-				ThreeMeans.calculate(chosenDAO.getDatabaseName(), snapshot);
+				Clusterer.calculate(chosenDAO.getDatabaseName(), snapshot);
 				
 			}
 

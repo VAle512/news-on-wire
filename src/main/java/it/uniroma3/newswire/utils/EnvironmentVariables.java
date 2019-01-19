@@ -6,4 +6,6 @@ public class EnvironmentVariables {
 	public static String goldens = "GOLDENS_FOLDER";
 	public static String envDebug = "DEBUG_FOLDER";
 	public static String envmodels = "MODELS_FOLDER";
+	public static String datasets = "DATASETS_FOLDER";
+	public static String analysisResults = "RESULTS_FOLDER";
 }

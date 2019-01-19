@@ -5,6 +5,7 @@
 /logs
 /data
 /debug
+/csv
 /crawler
 /.m2
 buildDocker.sh

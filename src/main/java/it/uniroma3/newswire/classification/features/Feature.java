@@ -4,21 +4,17 @@
 package it.uniroma3.newswire.classification.features;
 
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.date;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.depth;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.file;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.id;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.link;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referringPage;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.relative;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.snapshot;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.depth;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.file;
-
-
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_DB_URL_PLACEHOLDER;
 
 import java.io.Serializable;
-import java.sql.Connection;
-import java.sql.SQLException;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -26,12 +22,14 @@ import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SQLContext;
+import org.apache.spark.storage.StorageLevel;
 import org.bson.Document;
 
 import it.uniroma3.newswire.persistence.DAO;
 import it.uniroma3.newswire.persistence.DAOPool;
 import it.uniroma3.newswire.properties.PropertiesReader;
 import it.uniroma3.newswire.spark.SparkLoader;
+import scala.Tuple2;
 
 /**
  * @author Luigi D'Onofrio
@@ -76,28 +74,32 @@ public abstract class Feature implements Serializable {
 	public JavaRDD<Document> loadData() {		
 		String url = DAO.DB_URL.replace(DB_NAME_PLACEHOLDER, this.database);
 		
-		if(cachedData == null)
-			this.cachedData =  sqlContext.read()
-			  	   						 	.format("jdbc")
-			  	   						 	.option("url", url)
-			  	   							.option("driver", DAO.JDBC_DRIVER)
-			  	   							.option("dbtable", LINK_OCCURRENCES)
-			  	   							.option("user", DAO.USER)
-			  	   							.option("password", DAO.PASS)
-			  	   							.load()
-			  	   							.toJavaRDD()
-			  	   							.map(row -> new Document().append(id.name(), 				row.getLong(id.ordinal()))
-			  	   													  .append(link.name(), 				row.getString(link.ordinal()))
-			  	   													  .append(referringPage.name(), 	row.getString(referringPage.ordinal()))
-			  	   										              .append(relative.name(), 		row.getString(relative.ordinal()))
-			  	   										              .append(xpath.name(), 			row.getString(xpath.ordinal()))
-			  	   										              .append(snapshot.name(), 		row.getInt(snapshot.ordinal()))
-			  	   										              .append(depth.name(), 			row.getInt(depth.ordinal()))
-			  	   										              .append(file.name(), 				row.getString(file.ordinal()))
-			  	   										              .append(date.name(), 				row.getTimestamp(date.ordinal())))
-			  	   							.cache();
+		return DataLoader.getInstance().loadData(this.database);
+	}
+	
+	/**
+	 * Loads up the data from the DB. It caches the data for future uses.
+	 * @return a {@link JavaRDD} of {@link Document}.
+	 */
+	public JavaPairRDD<String, Double> loadCachedData() {		
+		String url = DAO.DB_URL.replace(DB_NAME_PLACEHOLDER, this.database);
 		
-		return this.cachedData;
+		try {
+			return sqlContext.read()
+						 	.format("jdbc")
+						 	.option("url", url)
+							.option("driver", DAO.JDBC_DRIVER)
+							.option("dbtable", this.getClass().getSimpleName())
+							.option("user", DAO.USER)
+							.option("password", DAO.PASS)
+							.load()
+							.toJavaRDD()
+							.mapToPair(row -> new Tuple2<>(row.getString(0), row.getDouble(1)))
+							.cache();
+		}catch (Exception e) {
+			return null;
+		}
+		
 	}
 		
 	/**

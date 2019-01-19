@@ -14,6 +14,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
 import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.storage.StorageLevel;
 import org.neo4j.driver.internal.util.Iterables;
 
 import com.google.common.collect.Lists;
@@ -51,36 +52,52 @@ public class PageHyperTextualContentDinamicity extends Feature{
 	public JavaPairRDD<String, Double> calculate(boolean persistResults, int untilSnapshot) {
 		log(INFO, "started");
 		
+		JavaPairRDD<String, Double> cached = loadCachedData();
+		if(cached !=null)
+			if(cached.count() != 0) {
+			log(INFO, "Data in cache loaded susccessfully: " + cached.count());
+			return cached.cache();
+		}
+		
 		/* Erase previous Stability Data */
 		erasePreviousBenchmarkData(persistResults);
 		
 		/* recalulcate link collections. */
 		JavaPairRDD<String, Double> phtRd =  (new PageHyperTextualReferencesDinamicity(this.database)).calculate(persistResults, untilSnapshot);
-		JavaPairRDD<Integer, Tuple4<String, String, String, Integer>> data = loadData().mapToPair(row -> new Tuple2<>(row.getInteger(id.name()),
+		JavaPairRDD<Long, Tuple4<String, String, String, Integer>> data = loadData().mapToPair(row -> new Tuple2<>(row.getLong(id.name()),
 																							  						 new Tuple4<>(
 																							  								 row.getString(link.name()),
 																							  								 row.getString(referringPage.name()),
 																							  								 row.getString(xpath.name()),
 																							  								 row.getInteger(snapshot.name()))
 																							  							)
-																									);
+																									).filter(x -> !x._2._1().equals("http://www.nytimes.com/events/"));
 		
 		if(untilSnapshot > 0)
 			data = data.filter(x -> x._2._4() <= untilSnapshot);
 		
 		JavaPairRDD<String, String> link2referringPage = data.mapToPair(tuple -> new Tuple2<>(tuple._2._1(), tuple._2._2()));
 		
-		JavaPairRDD<String, Double> referringPage2ContentDinamicity = link2referringPage.join(phtRd)
+		JavaPairRDD<String, Double> referringPage2ContentDinamicity = link2referringPage.join(phtRd)																				
 																						.mapToPair(tuple -> new Tuple2<>(tuple._2._1, tuple._2._2))
 																						.groupBy(tuple -> tuple._1) //Grouping by referring page.
-																						.mapToPair(tuple -> new Tuple2<>(tuple._1, Lists.newArrayList(tuple._2).stream().mapToDouble(x -> x._2).sum()));
+																						.mapToPair(tuple -> new Tuple2<>(tuple._1, Lists.newArrayList(tuple._2).stream().mapToDouble(x -> x._2).sum()))
+																						.persist(StorageLevel.MEMORY_ONLY_SER());
+		
+		JavaPairRDD<String,Double> savior = link2referringPage.map(x -> x._1).distinct().subtract(referringPage2ContentDinamicity.map(k->k._1)).mapToPair(x -> new Tuple2<>(x, -1.0));
+		System.out.println(link2referringPage.map(x -> x._1).distinct().count());
+		System.out.println(referringPage2ContentDinamicity.count());
+		
+		JavaPairRDD<String, Double> results= savior.union(referringPage2ContentDinamicity);
+		//.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue));
+		
 		if(persistResults)
-			persist(referringPage2ContentDinamicity);
+			persist(results);
 		
 		log(INFO, "ended.");
 
 		
-		return referringPage2ContentDinamicity;
+		return results;
 	}
 	
 
