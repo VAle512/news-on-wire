@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,27 +17,33 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.mllib.evaluation.MulticlassMetrics;
 import org.apache.spark.mllib.linalg.Vectors;
 import org.apache.spark.mllib.regression.LabeledPoint;
-import org.apache.spark.mllib.tree.DecisionTree;
+import org.apache.spark.mllib.tree.RandomForest;
 import org.apache.spark.mllib.tree.model.DecisionTreeModel;
+import org.apache.spark.mllib.tree.model.RandomForestModel;
 
 import it.uniroma3.newswire.spark.SparkLoader;
 import it.uniroma3.newswire.utils.EnvironmentVariables;
 import it.uniroma3.newswire.utils.URLUtils;
 import scala.Tuple2;
+import scala.Tuple3;
 
-public class KFoldCrossValidation {
-	private static Logger logger = Logger.getLogger(KFoldCrossValidation.class);
-	
+/**
+ * Classificatore che addestra un modello basato su Random Forest
+ * @author luigi
+ *
+ */
+public class RandomForestClassifier {
+	private static Logger logger = Logger.getLogger(RandomForestClassifier.class);
+
 	/**
-	 * Esegue l'addestramento di un modello basato su Decision Tree usando K-Fold Cross-Validation.
+	 * Esegue l'addestramento di un modello basato su Decision Tree.
 	 * @param websiteRoot è la home del sito che vogliamo studiare.
 	 * @param snapshot è lo snapshot fino al quale vogliamo eseguire l'addetsramento.
-	 * @param k è il numero di pezzi in cui vogliamo dividere i nostri dati per eseguire il K-Fold.
 	 * @param featureCount è il numero di features che vogliamo considerare.
-	 * @return FIXME: Delle metriche, in seguito dovrà restituire il modello vero e proprio.
+	 * @return il modello con alcune metriche.
 	 * @throws Exception
 	 */
-	public static Tuple2<MulticlassMetrics, Double> run(String websiteRoot,int snapshot, int k, int featureCount) throws Exception {		
+	public static Tuple3<RandomForestModel, MulticlassMetrics, Double> train(String websiteRoot,int snapshot, int featureCount) throws Exception {
 		String csvFolder = System.getenv(EnvironmentVariables.datasets);
 		String databaseName = URLUtils.getDatabaseNameOf(websiteRoot);		
 		String trainingSetPath = csvFolder + File.separator + databaseName + "_" + snapshot + "_training.csv";
@@ -49,6 +54,7 @@ public class KFoldCrossValidation {
 		List<String> csvLines = null;
 		try {
 			csvLines = Files.readAllLines(Paths.get(trainingSetPath), StandardCharsets.UTF_8);
+			logger.info("Read lines: " + csvLines.size());
 			logger.info("CSV already there @ " + snapshot);
 		} catch(NoSuchFileException e) {
 			/*
@@ -73,6 +79,7 @@ public class KFoldCrossValidation {
 												 */
 												.parallelize(csvLines.parallelStream().map(x -> {
 													String[] commaSplit = x.split(",");
+													
 													double[] vec = new double[commaSplit.length - 2];
 													
 													double label = Double.parseDouble(commaSplit[commaSplit.length-1]);
@@ -80,10 +87,22 @@ public class KFoldCrossValidation {
 													 * Aggiungiamo il numero di features richieste (in maniera ordinata).
 													 * FIXME: Da far diventare casuale magari.
 													 */
-													for(int i = 0; i < featureCount; ++i) {
-														vec[i] = Double.parseDouble(commaSplit[i+1]);
-													}
+													int j = 0;
 													
+													if(featureCount == 1)
+														j = 1;
+													if(featureCount == 2)
+														j = 2;
+
+														vec[0] = Double.parseDouble(commaSplit[2]);
+														vec[1] = Double.parseDouble(commaSplit[1]);
+//													}
+													
+													/* XXX: Delete this shit for developing only
+													 * 
+													 */
+													if (label == 2)
+														label = 1;
 													return new Tuple2<>(label, Vectors.dense(vec));
 												})
 														
@@ -96,102 +115,31 @@ public class KFoldCrossValidation {
 		/*
 		 * Effettuiamo uno shuffle dei dati per essere immuni da qualsivoglia influenza di ordinamento.
 		 */
+		data = OverSampler.applyTo(data);
 		data = shuffleData(data);
 		
-		/*
-		 * Splittiamo i dati in K gruppi (5 - 10 empiricamente).
-		 */
-		List<JavaRDD<LabeledPoint>> groups = splitIntoKGroups(k, data);
-		
-		List<JavaRDD<LabeledPoint>> trainingSet = new ArrayList<>();
-		JavaRDD<LabeledPoint> testSet;
-		
-		Tuple2<MulticlassMetrics, Double> bestModel = null;
 		
 		/*
-		 * A turno ogni gruppo fa da test set e la restante parte dei dati fa da training set.
+		 * Splittiamo i dati in training e test set.
 		 */
-		for(int i = 0; i < groups.size(); ++i) {
-			testSet = groups.get(i);
-			trainingSet.addAll(groups);
-			
-			/*
-			 * Se un test set è troppo piccolo potrebbe non essere significativo. Indicativamente più piccolo dell'80% del primo gruppo.
-			 */
-			if(testSet.count() < groups.get(0).count() * 0.8)
-				continue;
-			
-			trainingSet.remove(i);
-			
-			JavaRDD<LabeledPoint> remainingData = SparkLoader.getInstance().getContext().emptyRDD();
-			for(JavaRDD<LabeledPoint> groupRDD: trainingSet)
-				remainingData = remainingData.union(groupRDD);
-			
-			/*
-			 * Applichiamo del super sampling per migliorare la qualità dei dati e sopperire al problema delle classi sbilanciate.
-			 */
-			remainingData = OverSampler.applyTo(remainingData);
-			
-			Tuple2<MulticlassMetrics, Double> evaluation = evaluate(remainingData, testSet);
-			double err = evaluation._2;
-						
-			if (bestModel == null)
-				bestModel = evaluation;
-			else if (err < bestModel._2) {
-				bestModel = evaluation;
-			}
-			trainingSet.clear();
-		}
+		JavaRDD<LabeledPoint>[] splits = data.randomSplit(new double[]{0.7, 0.3});
+		JavaRDD<LabeledPoint> trainingSet = splits[0];
+		JavaRDD<LabeledPoint> testSet = splits[1];
 		
-//		MulticlassMetrics metrics = bestModel._1;
-//		printMetrics(metrics);
-		
-		return bestModel;
-	}
-	
-	private static List<JavaRDD<LabeledPoint>> splitIntoKGroups(int k, JavaRDD<LabeledPoint> data) {
-		long groupSize = data.count() / k;
-		List<JavaRDD<LabeledPoint>> groups = new ArrayList<>();
-		
-		JavaPairRDD<LabeledPoint, Long> indexedData = data.zipWithIndex().cache();
-		
-		for (int i = 0; i < data.count(); i+=groupSize) {
-			final int idx = i;
-			groups.add(indexedData.filter(indexed -> indexed._2 >= idx && indexed._2 < idx + groupSize).map(x -> x._1));
-		}
-		
-		return groups;
-	}
-	
-	@SuppressWarnings("unused")
-	private static void printMetrics(MulticlassMetrics metrics) {
-		for(int c=0; c < 3; c++) {
-			System.out.println("Measures for class: " + c);	
-			double precision = metrics.precision(c);
-			double recall = metrics.recall(c);
-			double f1 = metrics.fMeasure(c);
-			System.out.println("p: " + precision + " r: " + recall + " f1: " + f1);
-		}
-	}
-	
-	private static Tuple2<MulticlassMetrics, Double> evaluate(JavaRDD<LabeledPoint> trainingSet, JavaRDD<LabeledPoint> testSet) {
-		/*
-		 * Imposta il numero delle classi in cui vogliamo classificare.
-		 */
-		int numClasses = 3;
-		
-		/*
-		 * Lasciare vuoto questa mappa se le features sono continue.
-		 */
+		// Train a RandomForest model.
+		// Empty categoricalFeaturesInfo indicates all features are continuous.
+		Integer numClasses = 2;
 		Map<Integer, Integer> categoricalFeaturesInfo = new HashMap<>();
+		Integer numTrees = 5; // Use more in practice.
+		String featureSubsetStrategy = "auto"; // Let the algorithm choose.
 		String impurity = "gini";
-		int maxDepth = 5;
-		int maxBins = 32;
+		Integer maxDepth = 5;
+		Integer maxBins = 32;
+		Integer seed = 12345;
 
-		/*
-		 * Addetsra un modello basato su Decision Tree.
-		 */
-		DecisionTreeModel model = DecisionTree.trainClassifier(trainingSet, numClasses, categoricalFeaturesInfo, impurity, maxDepth, maxBins);
+		RandomForestModel model = RandomForest.trainClassifier(trainingSet, numClasses,
+		  categoricalFeaturesInfo, numTrees, featureSubsetStrategy, impurity, maxDepth, maxBins,
+		  seed);
 		
 		/*
 		 * Effettuiamo delle predizioni sul test set e calcoliamo tutte le metriche relative.
@@ -199,9 +147,13 @@ public class KFoldCrossValidation {
 		JavaPairRDD<Object, Object> predictionAndLabels = testSet.mapToPair(p -> new Tuple2<>(model.predict(p.features()), p.label()));
 		double testErr = predictionAndLabels.filter(pl -> !pl._1().equals(pl._2())).count() / (double) testSet.count();
 		
+//		predictionAndLabels.foreach(x -> System.out.println(x));
 		MulticlassMetrics metrics = new MulticlassMetrics(predictionAndLabels.rdd());
+//		printMetrics(metrics);
+//		System.out.println(testErr);
 		
-		return new Tuple2<>(metrics,testErr);
+		return new Tuple3<>(model,metrics,testErr);
+
 	}
 	
 	/**
@@ -218,6 +170,17 @@ public class KFoldCrossValidation {
 		return data.mapToPair(point -> new Tuple2<>(ThreadLocalRandom.current().nextLong(countData), point))
 				   .sortByKey()
 				   .map(x -> x._2);
+	}
+	
+	@SuppressWarnings("unused")
+	public static void printMetrics(MulticlassMetrics metrics) {
+		for(int c=0; c < 2; c++) {
+			System.out.println("Measures for class: " + c);	
+			double precision = metrics.precision(c);
+			double recall = metrics.recall(c);
+			double f1 = metrics.fMeasure(c);
+			System.out.println("p: " + precision + " r: " + recall + " f1: " + f1);
+		}
 	}
 	
 }

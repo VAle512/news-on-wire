@@ -24,7 +24,7 @@
           				<manifest>
           					<addClasspath>true</addClasspath>
                         	<classpathPrefix>${project.build.directory}/dependency</classpathPrefix>
-            				<mainClass>it.uniroma3.newswire.cli.Init</mainClass>
+            				<mainClass>it.uniroma3.newswire.cli.ReportStartup</mainClass>
           				</manifest>
         			</archive>
       			</configuration>
@@ -156,10 +156,10 @@
 		</dependency>
 		
 		<dependency>
-    		<groupId>nz.ac.waikato.cms.weka</groupId>
-    		<artifactId>weka-stable</artifactId>
-    		<version>3.6.6</version>
-		</dependency>
+      		<groupId>com.github.haifengl</groupId>
+      		<artifactId>smile-core</artifactId>
+      		<version>1.5.2</version>
+    	</dependency>
 		
     </dependencies>
 

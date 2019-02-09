@@ -3,6 +3,7 @@ package it.uniroma3.newswire.persistence;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.date;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.depth;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.file;
+import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.id;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.link;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referringPage;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.relative;
@@ -38,13 +39,12 @@ import java.util.stream.Collectors;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
-import org.neo4j.driver.internal.util.Iterables;
-
-import com.google.common.collect.Lists;
+import org.apache.spark.api.java.JavaRDD;
+import org.bson.Document;
 
 import it.uniroma3.newswire.benchmark.BenchmarkResult;
-import it.uniroma3.newswire.classification.features.PageHyperTextualReferencesDinamicity;
 import it.uniroma3.newswire.classification.features.HyperTextualContentDinamycityPlusStability;
+import it.uniroma3.newswire.classification.features.PageHyperTextualReferencesDinamicity;
 import it.uniroma3.newswire.classification.features.Stability;
 import it.uniroma3.newswire.persistence.schemas.LinkOccourrences;
 import it.uniroma3.newswire.properties.PropertiesReader;
@@ -726,7 +726,10 @@ public class DAO implements Serializable{
 		Statement stmnt = null;
 		try {
 			stmnt = conn.createStatement();
-			result = stmnt.executeQuery("SELECT * FROM " + LINK_OCCURRENCES_TABLE + " WHERE snapshot <= " + snapshot);
+			if(snapshot == 2)
+				result = stmnt.executeQuery("SELECT * FROM " + LINK_OCCURRENCES_TABLE + " WHERE snapshot <= " + snapshot);
+			else
+				result = stmnt.executeQuery("SELECT * FROM " + LINK_OCCURRENCES_TABLE + " WHERE snapshot >= " + (snapshot - 1) + " AND snapshot <= " + snapshot);
 			
 			while(result.next())
 				xpaths.add(new Tuple4<>(result.getLong(1), result.getString(3), new XPath(result.getString(5)), result.getInt(6)));
@@ -848,6 +851,39 @@ public class DAO implements Serializable{
 			return null;
 		}finally {
 			clearResources(connection, stmnt, null, null);
+		}
+	}
+	/*
+	 * Restituisce la lista di {@link Document} di occorrenze di link fra due snapshot.
+	 * Non mi piace per Information Expert: costringo una classe DAO a sapere dell'esistenza degli RDD.
+	 */
+	public List<Document> getLinkOccurrenciesBeforeSnapshot(int fromSnapshot, int toSnapshot, boolean isRange) {
+		Connection connection = this.getConnection();
+		Statement stmnt = null;
+		ResultSet result = null;
+		List<Document> docs = new ArrayList<>();
+		try {
+			stmnt = connection.createStatement();
+			if(isRange)
+				result = stmnt.executeQuery("SELECT * FROM LinkOccourrences WHERE snapshot >= " + fromSnapshot + " AND snapshot <= " + toSnapshot);
+			else
+				result = stmnt.executeQuery("SELECT * FROM LinkOccourrences WHERE snapshot > " + fromSnapshot + " AND snapshot <= " + toSnapshot);
+			while(result.next())
+				docs.add(new Document().append(id.name(),(long)result.getLong(id.ordinal() + 1))
+																		  .append(link.name(), 				result.getString(link.ordinal() + 1))
+																		  .append(referringPage.name(), 	result.getString(referringPage.ordinal()+ 1))
+															              .append(relative.name(), 		result.getString(relative.ordinal()+ 1))
+															              .append(xpath.name(), 			result.getString(xpath.ordinal()+ 1))
+															              .append(snapshot.name(), 		result.getInt(snapshot.ordinal()+ 1))
+															              .append(date.name(), 				result.getTimestamp(date.ordinal()+ 1))
+															              .append(depth.name(), 			result.getInt(depth.ordinal()+ 1))
+															              .append(file.name(), 				result.getString(file.ordinal()+ 1)));
+			return docs;
+		}catch(SQLException e) {
+			log(ERROR, e.getMessage());
+			return null;
+		}finally {
+			clearResources(connection, stmnt, null, result);
 		}
 	}
 	

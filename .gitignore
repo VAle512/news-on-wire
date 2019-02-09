@@ -1,7 +1,11 @@
 /target
 .classpath
+.project
 /.settings
+/csv_old
+/goldens
 /bin/
+/results
 /logs
 /data
 /debug

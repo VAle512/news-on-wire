@@ -60,7 +60,7 @@ public class PageHyperTextualContentDinamicity extends Feature{
 		}
 		
 		/* Erase previous Stability Data */
-		erasePreviousBenchmarkData(persistResults);
+		erasePreviousResultsData(persistResults);
 		
 		/* recalulcate link collections. */
 		JavaPairRDD<String, Double> phtRd =  (new PageHyperTextualReferencesDinamicity(this.database)).calculate(persistResults, untilSnapshot);
@@ -89,7 +89,6 @@ public class PageHyperTextualContentDinamicity extends Feature{
 		System.out.println(referringPage2ContentDinamicity.count());
 		
 		JavaPairRDD<String, Double> results= savior.union(referringPage2ContentDinamicity);
-		//.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue));
 		
 		if(persistResults)
 			persist(results);

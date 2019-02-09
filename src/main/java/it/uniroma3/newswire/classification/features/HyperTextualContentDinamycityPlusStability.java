@@ -44,7 +44,7 @@ public class HyperTextualContentDinamycityPlusStability extends Feature{
 		this.stabilityRDD = (new Stability(this.database)).calculate(persistResults, untilSnapshot);
 
 		/* Erase previous Combined Data */
-		erasePreviousBenchmarkData(persistResults);
+		erasePreviousResultsData(persistResults);
 		
 		/* This represents a puppet score in which we don't consider innerMoving score. */
 		JavaPairRDD<String, Double> combined = hyperTextualContentDinamycityRDD.join(this.stabilityRDD)

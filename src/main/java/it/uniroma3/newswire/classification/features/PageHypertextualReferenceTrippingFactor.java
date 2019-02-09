@@ -54,7 +54,7 @@ public class PageHypertextualReferenceTrippingFactor extends Feature{
 		
 		/* Erase previous Stability Data */
 		if(persistResults)
-			erasePreviousBenchmarkData(persistResults);
+			erasePreviousResultsData(persistResults);
 		
 	
 		//FIXME: Debug purposes swapped relative and referringPage

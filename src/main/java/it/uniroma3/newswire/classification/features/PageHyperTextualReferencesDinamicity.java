@@ -9,33 +9,31 @@ import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
 import static org.apache.log4j.Level.INFO;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
 import org.apache.spark.api.java.JavaPairRDD;
-import org.apache.spark.storage.StorageLevel;
-import org.neo4j.driver.internal.util.Iterables;
+import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.Function2;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 import it.uniroma3.newswire.persistence.DAO;
-import it.uniroma3.newswire.properties.PropertiesReader;
 import it.uniroma3.newswire.spark.SparkLoader;
 import scala.Tuple2;
 import scala.Tuple3;
 import scala.Tuple4;
 
 /**
- * This class is intended to quantify the motion of a link inside a specific page and link collection.
- * in terms of how many xpath changes it counts across all the pages that reference that link.
+ * Questa classe modella una feature che calcola perogni link la dinamicità delle sue occorrenze.
+ * Questa dinamicità è intesa in termini di numeri di cambiamenti di xpath tra snapshot in specifiche link collections.
+ * Ottimizzato.
  * @author Luigi D'Onofrio
  *
  */
 public class PageHyperTextualReferencesDinamicity extends Feature{
-	
 	/**
 	 * Constructor.
 	 * @param dbName is the database of the website we are executing the benchmark for.
@@ -52,23 +50,22 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 	@SuppressWarnings("unchecked")
 	public JavaPairRDD<String, Double> calculate(boolean persistResults, int untilSnapshot) {
 		log(INFO, "started");
+	
+		/*
+		 * Prendo i dati calcolati per lo snapshot precedente.
+		 */
+		JavaPairRDD<String, Double> previousSnapshotData = loadPreviousSnapshotData();
 		
-		JavaPairRDD<String, Double> cached = loadCachedData();
-		if(cached !=null)
-			if(cached.count() != 0) {
-			log(INFO, "Data in cache loaded susccessfully: " + cached.count());
-			return cached.cache();
-		}
-		
-		/* Erase previous Stability Data */
-		if(persistResults)
-			erasePreviousBenchmarkData(persistResults);
+		@SuppressWarnings("unused")
+		JavaPairRDD<String, Double> result;
+		/*
+		 * If no data present, is the first run.
+		 */
 		
 		/* recalulcate link collections. */
 		JavaPairRDD<Long, String> collections =  getCollections(getAssociatedDAO(), untilSnapshot);
 		
-		//FIXME: Debug purposes swapped relative and referringPage
-		JavaPairRDD<Long, Tuple4<String, String, String, Integer>> data = loadData().mapToPair(row -> new Tuple2<>(row.getLong(id.name()),
+		JavaPairRDD<Long, Tuple4<String, String, String, Integer>> data = loadDataIncremental(untilSnapshot, true).mapToPair(row -> new Tuple2<>(row.getLong(id.name()),
 																							  						 new Tuple4<>(
 																							  								 row.getString(link.name()),
 																							  								 row.getString(referringPage.name()),
@@ -76,16 +73,7 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 																							  								 row.getInteger(snapshot.name()))
 																							  							)
 																									);
-		
-		Map<String, Long> link2Counterino = data.map(x -> x._2)
-														.groupBy(x -> x._1())
-														.mapToPair(x -> new Tuple2<>(x._1, Lists.newArrayList(x._2).stream().count()))
-														.collectAsMap();
 
-		
-		if(untilSnapshot > 0)
-			data = data.filter(x -> x._2._4() <= untilSnapshot);
-		
 		JavaPairRDD<Tuple3<String, String, String>, Tuple2<String, Integer>> join = data.join(collections).mapToPair(x -> new Tuple2<>(
 																														  		new Tuple3<>(
 																														  				x._2._1._1(), 
@@ -94,22 +82,42 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 																														  		new Tuple2<>(
 																														  				x._2._1._3(),
 																														  				x._2._1._4())));
-		
-		
+		Function<Tuple2<String, Integer>, 
+			     List<Tuple2<String, Integer>>> createCombiner =
+			     	tuple -> Lists.newArrayList(tuple);
+			     	
+		Function2<List<Tuple2<String, Integer>>,
+				 Tuple2<String, Integer>, 
+				 List<Tuple2<String, Integer>>> mergeValue =
+				     	(lst, value) -> {
+				     		lst.add(value);
+				     		return lst;
+				     	};
+     	Function2<List<Tuple2<String, Integer>>,
+     			  List<Tuple2<String, Integer>>, 
+     			  List<Tuple2<String, Integer>>> mergeCombiners =
+		     	(lst, values) -> {
+		     		lst.addAll(values);
+		     		return lst;
+		     	};
+
 		/* Here we group by (link, referring page) to isolate link occurrences 
 		 * of the same page but picked in different snapshots.
 		 */
 		JavaPairRDD<String, Double> collectionMovement = join
 									  						/* Some XPath could be null, better to remove them. */
 									  						.filter(row -> row._1._3()!=null && row._2._1()!=null)
-									  						.groupBy(pair -> pair._1)   
-									  						.map(group -> { 
+									  						
+									  						.combineByKey(createCombiner, mergeValue, mergeCombiners)
+									  						
+//									  						.groupBy(pair -> pair._1)   
+									  						.mapToPair(group -> { 
 									  							/* Let's count how many "XPath's changes" there are for a link across snaphshot in the same link collection. */
-									  							Set<Tuple2<String, Integer>> xpath2Snapshot = Iterables.asList(group._2).stream().map(x -> x._2).collect(Collectors.toSet());			  
+									  							Set<Tuple2<String, Integer>> xpath2Snapshot = Sets.newHashSet(group._2);			  
 									  							Set<List<Tuple2<String, Integer>>> allPossiblesCouples = Sets.cartesianProduct(xpath2Snapshot, xpath2Snapshot);	
 									  							
 									  							
-									  							/* We create this collection which has in it all those tuples which have a sibling avross a snapshot.
+									  							/* We create this collection which has in it all those tuples which have a sibling across a snapshot.
 									  							 * This is useful when we have two link occurrences whihc point to the same page and we cannot distinguish between them.
 									  							 */
 									  							final LinkedBlockingQueue<Tuple2<Integer, Integer>> misleadingEqualities = new LinkedBlockingQueue<>(
@@ -160,33 +168,33 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 			      
 									  							return new Tuple2<>(group._1, count);
 									  						})
-									  						.groupBy(x -> x._1._1())
-									  						//TODO: normalize on num of occurrences
-									  						.map(x -> {
-//									  							double count = (link2Counterino.get(x._1) != null) ? link2Counterino.get(x._1): 1;
-									  							long differences = Iterables.asList(x._2).stream().mapToLong(y -> y._2).sum();
-									  							return new Tuple2<>(x._1, differences);
-									  						})
-									  						.mapToPair(tuple -> new Tuple2<>(tuple._1, new Double(tuple._2)))
-									  						.persist(StorageLevel.MEMORY_ONLY_SER());;
+									  						.mapToPair(x -> new Tuple2<String, Long>(x._1._1(), x._2))
+									  						.reduceByKey((a, b) -> a + b)							  						
+									  						.mapToPair(tuple -> new Tuple2<>(tuple._1, (double) tuple._2));
+									  						
 		
-		//collectionMovement = collectionMovement.filter(x -> !x._1.equals("http://www.nytimes.com/events/"));
-		
-		//DEPRECATED: For normalization
-		double maxValue = collectionMovement.mapToDouble(x -> x._2).max();
-		double minValue = collectionMovement.mapToDouble(x -> x._2).min();
-		
-		JavaPairRDD<String, Double> normalization = collectionMovement.mapToPair(x -> new Tuple2<>(x._1, minMaxNormOf(x._2, minValue, maxValue)));
-		
-		if(persistResults) {
-			persist(collectionMovement);
+		//Dunque è la prima volta
+		if(previousSnapshotData == null) { 
+			logger.info("No previous data present: Initializing data structure.");
+
+		} else { //Bisogna mergiare
+			logger.info("Previous Data found: Using for re-calculation.");
+			List<String> newEntries = collectionMovement.keys().subtract(previousSnapshotData.keys()).collect();
+			List<String> oldEntries = previousSnapshotData.keys().subtract(collectionMovement.keys()).collect();
+			JavaPairRDD<String, Double> newz = collectionMovement.filter(x -> newEntries.contains(x._1));
+			JavaPairRDD<String, Double> oldz = previousSnapshotData.filter(x -> oldEntries.contains(x._1));
+			
+			
+			collectionMovement = previousSnapshotData.join(collectionMovement).mapToPair(x -> new Tuple2<>(x._1, x._2._1 + x._2._2));
+			collectionMovement = collectionMovement.union(newz);
+			collectionMovement = collectionMovement.union(oldz);
 		}
+		
+		erasePreviousResultsData(true);
+		persist(collectionMovement);
 		
 		log(INFO, "ended.");
 
-		
-		//TODO: Bisogna capire come fare a far tornare un valore nell'intervallo 0-1 e ad utilizzarlo nelle analisi combinate.
-		//return collectionMovement.mapToPair(x -> new Tuple2<>(x._1, x._2/maxValue));
 		return collectionMovement;
 	}
 	
@@ -197,13 +205,8 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 	 * @return an RDD made of couples (id, collection).
 	 */
 	private JavaPairRDD<Long, String> getCollections(DAO dao, int snapshot) {
-		/* Take the property */
-		boolean persistLinkCollections = Boolean.parseBoolean(propsReader.getProperty(PropertiesReader.BENCHMARK_PERSIST_LINK_COLLECTIONS));
-		
-		
-		if(persistLinkCollections)
-			dao.createLinkCollectionsTable();
-		
+
+
 		List<Tuple2<String, Set<Long>>> collection2ids = findCollections(dao.getXPathsUntil(snapshot));
 		
 		JavaPairRDD<Long, String> id2collectionRDD =  SparkLoader.getInstance().getContext()
@@ -211,9 +214,7 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 																			 .map(x -> x._2.stream().map(id -> new Tuple2<>(x._1, id)))
 																			 .flatMap(x -> x.iterator())
 																			 .mapToPair(x -> new Tuple2<>(x._2, x._1));
-		if(persistLinkCollections)
-			dao.updateCollections(collection2ids);
-		
+		System.out.println("Collections:" + id2collectionRDD.count());	
 		return id2collectionRDD;
 	}
 
@@ -225,10 +226,12 @@ public class PageHyperTextualReferencesDinamicity extends Feature{
 		return score <= threshold;
 	}
 	
+	@Deprecated
 	private double sigmoidOf(Long n) {
 		return 1 / (1 + Math.exp(-n));
 	}
 	
+	@Deprecated
 	private double minMaxNormOf(Double n, Double min, Double max) {
 		return (double) (n - min) / (double) (max - min);
 	}

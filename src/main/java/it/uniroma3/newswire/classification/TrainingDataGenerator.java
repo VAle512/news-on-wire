@@ -15,10 +15,11 @@ import it.uniroma3.newswire.classification.features.PageHypertextualReferenceTri
 import it.uniroma3.newswire.classification.features.Stability;
 import it.uniroma3.newswire.classification.features.TextToBodyRatio;
 import it.uniroma3.newswire.persistence.DAOPool;
+import it.uniroma3.newswire.spark.SparkLoader;
 import it.uniroma3.newswire.utils.EnvironmentVariables;
 import it.uniroma3.newswire.utils.URLUtils;
 import scala.Tuple2;
-import scala.Tuple6;
+import scala.Tuple3;
 
 /**
  * Questa classe si occupa di generare e costruire un dataset per un addestramento.
@@ -36,17 +37,19 @@ public class TrainingDataGenerator {
 		 */
 		Stability stability = new Stability(dbName);
 		PageHyperTextualReferencesDinamicity hrd = new PageHyperTextualReferencesDinamicity(dbName);
-		PageHyperTextualContentDinamicity hcd = new PageHyperTextualContentDinamicity(dbName);
-		PageHypertextualReferenceTrippingFactor trip = new PageHypertextualReferenceTrippingFactor(dbName);
-		TextToBodyRatio ttbr = new TextToBodyRatio(dbName, website);
+//		PageHyperTextualContentDinamicity hcd = new PageHyperTextualContentDinamicity(dbName);
+//		PageHypertextualReferenceTrippingFactor trip = new PageHypertextualReferenceTrippingFactor(dbName);
+//		TextToBodyRatio ttbr = new TextToBodyRatio(dbName, website);
 		
 		File csvFile = new File(System.getenv(EnvironmentVariables.datasets) + "/" + dbName + "_" + snapshot + "_training.csv");
 		
-		JavaPairRDD<String, Double> stabilityRDD = stability.calculate(false, snapshot);
-		JavaPairRDD<String, Double> dinamicityRDD = hrd.calculate(true, snapshot); // Questa feature viene memorizzata sul DB poihcè serve per il calcolo di altre features.
-		JavaPairRDD<String, Double> contentRDD = hcd.calculate(false, snapshot);
-		JavaPairRDD<String, Double> trustnessRDD = trip.calculate(false, snapshot);
-		JavaPairRDD<String, Double> textRDD = ttbr.calculate(false, snapshot);
+		JavaPairRDD<String, Double> dinamicityRDD = hrd.calculate(false, snapshot).cache(); // Questa feature viene memorizzata sul DB poihcè serve per il calcolo di altre features.
+
+		JavaPairRDD<String, Double> stabilityRDD = stability.calculate(false, snapshot).cache();
+		//FIXME: Mettere a vero per ulteriori tests
+//		JavaPairRDD<String, Double> contentRDD = hcd.calculate(false, snapshot);
+//		JavaPairRDD<String, Double> trustnessRDD = trip.calculate(false, snapshot);
+//		JavaPairRDD<String, Double> textRDD = ttbr.calculate(false, snapshot);
 		
 		/*
 		 * Ottieni i golden samples dal DB.
@@ -64,30 +67,31 @@ public class TrainingDataGenerator {
 		 * Andiamo a mettere in fila, separati da virgole, tutti i valori delle features.
 		 * In cima abbiamo il link, utile per controllare, in coda abbiamo la classe di appartenenza.
 		 */
-		stabilityRDD.join(dinamicityRDD).join(contentRDD).join(trustnessRDD).join(textRDD).join(goldenClasses)
+		stabilityRDD.join(dinamicityRDD) /*.join(contentRDD).join(trustnessRDD).join(textRDD). */ .join(goldenClasses)
 					.mapToPair(x -> {
-						double stabilityValue = x._2._1._1._1._1._1;
-						double dinamicityValue = x._2._1._1._1._1._2;
-						double contentDinamicityValue = x._2._1._1._1._2;
-						double referenceTrippingFactorValue = x._2._1._1._2;
-						double textToBodyRatioValue = x._2._1._2;
+						double stabilityValue = x._2._1._1;
+						double dinamicityValue = x._2._1._2;
+//						double contentDinamicityValue = x._2._1._1._1._2;
+//						double referenceTrippingFactorValue = x._2._1._1._2;
+//						double textToBodyRatioValue = x._2._1._2;
 						
 						int cls = x._2._2;
 						
-						return new Tuple2<>(x._1, new Tuple6<>(stabilityValue, 
-																dinamicityValue, 
-																contentDinamicityValue, 
-																referenceTrippingFactorValue, 
-																textToBodyRatioValue, 
-																cls));
+//						return new Tuple2<>(x._1, new Tuple6<>(stabilityValue, 
+//																dinamicityValue, 
+//																contentDinamicityValue, 
+//																referenceTrippingFactorValue, 
+//																textToBodyRatioValue, 
+//																cls));
+						
+						return new Tuple2<>(x._1, new Tuple3<>(stabilityValue, 
+								dinamicityValue, 
+								cls));
 					})
 					.map(x -> x._1 + "," + 
 								x._2._1() + "," + 
 								x._2._2() + "," + 
-								x._2._3() + "," + 
-								x._2._4() + "," + 
-								x._2._5() + "," + 
-								x._2._6() + "\n")
+								x._2._3() + "," + "\n")
 					.filter(x -> !x.contains("-1.0")) //Rimuoviamo i dati non buoni.
 					.collect()
 					.forEach(x -> {
@@ -100,8 +104,11 @@ public class TrainingDataGenerator {
 		/*
 		 * Cancelliamo i dati memorizzati sul DB per quanto riguarda le features che servivano anche in passi intermedi.
 		 */
-		DAOPool.getInstance().getDAO("nytimes_com").cleanTable(PageHyperTextualReferencesDinamicity.class.getSimpleName());
-		
+//		DAOPool.getInstance().getDAO("nytimes_com").cleanTable(PageHyperTextualReferencesDinamicity.class.getSimpleName());
+		stabilityRDD.unpersist();
+		dinamicityRDD.unpersist();
+		DataLoader.getInstance().incrementSnapshotTo(snapshot);
+		SparkLoader.getInstance().getContext().getPersistentRDDs().forEach((k,v) -> System.out.println(k + " - " + v.count()));
 		
 	}
 	

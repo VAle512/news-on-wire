@@ -100,7 +100,7 @@ public class OverSampler {
 		 * Effettuiamo anche uno shuffle successivamente alla generazione poichè alternativamente i dati sarebbero stati generati in ordine ed avrebbero potuto creare
 		 * delle influenze sugli esisti dell'addestramento.
 		 */
-		return KFoldCrossValidation.shuffleData(unbalancedData.union(SparkLoader.getInstance().getContext().parallelize(newPoints)));
+		return RandomForestClassifier.shuffleData(unbalancedData.union(SparkLoader.getInstance().getContext().parallelize(newPoints)));
 	}
 	
 	/**

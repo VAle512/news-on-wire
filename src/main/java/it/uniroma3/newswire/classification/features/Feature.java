@@ -1,20 +1,9 @@
-/**
- * 
- */
 package it.uniroma3.newswire.classification.features;
 
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.date;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.depth;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.file;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.id;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.link;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referringPage;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.relative;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.snapshot;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_DB_URL_PLACEHOLDER;
 
 import java.io.Serializable;
+import java.sql.SQLException;
 
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
@@ -22,7 +11,6 @@ import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SQLContext;
-import org.apache.spark.storage.StorageLevel;
 import org.bson.Document;
 
 import it.uniroma3.newswire.persistence.DAO;
@@ -48,7 +36,6 @@ public abstract class Feature implements Serializable {
 	protected String resultsTable;
 	protected String database;
 	protected JavaRDD<Document> cachedData;
-	
 	/**
 	 * Constructor.
 	 * @param dbName is the database of the website we are executing the benchmark for.
@@ -71,10 +58,22 @@ public abstract class Feature implements Serializable {
 	 * Loads up the data from the DB. It caches the data for future uses.
 	 * @return a {@link JavaRDD} of {@link Document}.
 	 */
-	public JavaRDD<Document> loadData() {		
-		String url = DAO.DB_URL.replace(DB_NAME_PLACEHOLDER, this.database);
-		
+	public JavaRDD<Document> loadData() {				
 		return DataLoader.getInstance().loadData(this.database);
+	}
+	
+	/**
+	 * Loads up the data from the DB. It caches the data for future uses.
+	 * @return a {@link JavaRDD} of {@link Document}.
+	 * @throws SQLException 
+	 */
+	public JavaRDD<Document> loadDataIncremental(int toSnapshot, boolean isRange) {
+		try {
+			return DataLoader.getInstance().incrementalLoadData(this.database, toSnapshot, isRange);
+		} catch (SQLException e ) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 	
 	/**
@@ -139,19 +138,18 @@ public abstract class Feature implements Serializable {
 	 * Saves results to the relative results table.
 	 * @param results is the RDD of (url, score) we want to persist.
 	 */
-	public void persist(JavaPairRDD<String, Double> results) {
+	protected void persist(JavaPairRDD<String, Double> results) {
 		results.foreachPartition(partitionRdd -> {	
-				DAOPool.getInstance().getDAO(this.database).insertAnalysisResult(this.resultsTable, partitionRdd);
+			DAOPool.getInstance().getDAO(this.database).insertAnalysisResult(this.resultsTable, partitionRdd);
 		});
 		logger.info("Results have been correctly saved to the DB.");
-	}
+	};
 	
 	/**
 	 * If @param persistResults is true, it deletes all the previous benchmarked data, nothing otherwise. 
 	 * @param persistResults
 	 */
-	protected void erasePreviousBenchmarkData(boolean persistResults) {
-		/* Erase previous Link Occurrence Dinamicity Data */
+	protected void erasePreviousResultsData(boolean persistResults) {
 		if(persistResults) {	
 			if(this.getAssociatedDAO().checkTableExists(this.resultsTable))
 				this.getAssociatedDAO().cleanTable(this.resultsTable);
@@ -181,4 +179,27 @@ public abstract class Feature implements Serializable {
 		logger.log(level, toAppend + " " + message);
 	}
 		
+	/**
+	 * Non serve specificare lo snapshot perchè i dati saranno riferiti sempre allo snapshot precedente.
+	 * @return
+	 */
+	protected JavaPairRDD<String, Double> loadPreviousSnapshotData() {
+		String url = DAO.DB_URL.replace(DB_NAME_PLACEHOLDER, this.database);
+		
+		try {
+			return sqlContext.read()
+						.format("jdbc")
+						.option("url", url)
+						.option("driver", DAO.JDBC_DRIVER)
+						.option("dbtable", this.getClass().getSimpleName())
+						.option("user", DAO.USER)
+						.option("password", DAO.PASS)
+						.load()
+						.toJavaRDD()
+						.mapToPair(row -> new Tuple2<>(row.getString(0), row.getDouble(1)))
+						.cache();
+			}catch (Exception e) {
+				return null;
+			}
+	}
 }

@@ -46,7 +46,7 @@ public class TextToBodyRatio extends Feature {
 		}
 		
 		/* Erase previous Stability Data */
-		erasePreviousBenchmarkData(persist);
+		erasePreviousResultsData(persist);
 		
 		long start = System.currentTimeMillis();
 		
