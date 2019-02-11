@@ -43,11 +43,16 @@ public class RandomForestClassifier {
 	 * @return il modello con alcune metriche.
 	 * @throws Exception
 	 */
-	public static Tuple3<RandomForestModel, MulticlassMetrics, Double> train(String websiteRoot,int snapshot, int featureCount) throws Exception {
+	public static Tuple3<RandomForestModel, MulticlassMetrics, Double> train(String websiteRoot,int snapshot, int featureCount, boolean simulation) throws Exception {
+		logger.info("Inizio fase classificazione. ");
 		String csvFolder = System.getenv(EnvironmentVariables.datasets);
-		String databaseName = URLUtils.getDatabaseNameOf(websiteRoot);		
-		String trainingSetPath = csvFolder + File.separator + databaseName + "_" + snapshot + "_training.csv";
-		
+		String databaseName = URLUtils.getDatabaseNameOf(websiteRoot);	
+		String trainingSetPath;
+		if(!simulation)
+			trainingSetPath = csvFolder + File.separator + databaseName + "_" + snapshot + "_training.csv";
+		else
+			trainingSetPath = csvFolder + File.separator + "simulation/" + databaseName + File.separator + databaseName + "_" + snapshot + "_training.csv";
+		System.out.println(trainingSetPath);
 		/*
 		 * Se esiste un training set pre-calcolato usa quello.
 		 */

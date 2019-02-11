@@ -7,7 +7,7 @@ package it.uniroma3.newswire.classification;
  * @author luigi
  *
  */
-public enum Classes {
+public enum WebsiteClass {
 	news,
 	other,
 	section

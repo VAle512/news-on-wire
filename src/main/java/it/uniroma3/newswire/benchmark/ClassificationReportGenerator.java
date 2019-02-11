@@ -115,7 +115,7 @@ public class ClassificationReportGenerator {
         		 * In caso eccediamo le maxIterations iteraziuoni prendiamo per buono il migliore.
         		 */
         		do {
-        			result = RandomForestClassifier.train(this.websiteRoot, s, i);
+        			result = RandomForestClassifier.train(this.websiteRoot, s, i, false);
         			
         			if(bestResult == null)
         				bestResult = result;
@@ -241,7 +241,7 @@ public class ClassificationReportGenerator {
         		 * In caso eccediamo le maxIterations iteraziuoni prendiamo per buono il migliore.
         		 */
         		do {
-        			result = RandomForestClassifier.train(this.websiteRoot, s, i);
+        			result = RandomForestClassifier.train(this.websiteRoot, s, i, false);
         			
         			if(bestResult == null)
         				bestResult = result;

@@ -1,6 +1,6 @@
 package it.uniroma3.newswire.cli;
 
-import static it.uniroma3.newswire.crawling.CrawlingDriver.crawl;
+import static it.uniroma3.newswire.crawling.GenericCrawlingDriver.crawl;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_TIMEUNIT;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_TIME_TO_WAIT;
 import static it.uniroma3.newswire.utils.EnvironmentVariables.envConfig;
