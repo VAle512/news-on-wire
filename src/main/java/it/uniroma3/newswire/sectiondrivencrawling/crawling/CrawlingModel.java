@@ -1,4 +1,4 @@
-package it.uniroma3.newswire.crawling;
+package it.uniroma3.newswire.sectiondrivencrawling.crawling;
 
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_DEPTH;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_STORAGE;

@@ -1,4 +1,4 @@
-package it.uniroma3.newswire.crawling;
+package it.uniroma3.newswire.sectiondrivencrawling.drivers;
 
 import org.apache.log4j.Logger;
 import org.apache.spark.mllib.evaluation.MulticlassMetrics;

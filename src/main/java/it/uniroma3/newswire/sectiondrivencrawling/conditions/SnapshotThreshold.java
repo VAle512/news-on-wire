@@ -1,4 +1,4 @@
-package it.uniroma3.newswire.crawling;
+package it.uniroma3.newswire.sectiondrivencrawling.conditions;
 
 /**
  * Semplice condizione di terminazione basata su una threshold sullo snapshot. Usata tipicamente nella fase 1 del section dirven crawling.

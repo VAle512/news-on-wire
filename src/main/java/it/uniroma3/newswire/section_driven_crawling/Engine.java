@@ -1,4 +1,4 @@
-package it.uniroma3.newswire.crawling;
+package it.uniroma3.newswire.section_driven_crawling;
 
 import static it.uniroma3.newswire.utils.EnvironmentVariables.envConfig;
 
@@ -15,18 +15,23 @@ import org.apache.parquet.Files;
 
 import it.uniroma3.newswire.properties.WebsiteConfiguration;
 import it.uniroma3.newswire.properties.WebsiteConfigurationReader;
+import it.uniroma3.newswire.sectiondrivencrawling.crawling.CrawlingModel;
+import it.uniroma3.newswire.sectiondrivencrawling.drivers.ClassificationDriver;
+import it.uniroma3.newswire.sectiondrivencrawling.drivers.CrawlingDriver;
+import it.uniroma3.newswire.sectiondrivencrawling.drivers.EngineDriver;
+import it.uniroma3.newswire.sectiondrivencrawling.drivers.FeatureExtractionDriver;
 
 /**
  * @author luigi
  *
  */
-public class SDCrawlingDriver {
-	private static SDCrawlingDriver instance;
-	private static Logger logger = Logger.getLogger(SDCrawlingDriver.class);
+public class Engine {
+	private static Engine instance;
+	private static Logger logger = Logger.getLogger(Engine.class);
 	private List<EngineDriver> drivers;
 	private ExecutorService threadPool = Executors.newCachedThreadPool();
 	
-	private SDCrawlingDriver() {
+	private Engine() {
 		try {
 			this.drivers = initializeDrivers();
 		} catch (IOException e) {
@@ -34,13 +39,12 @@ public class SDCrawlingDriver {
 		}
 	}
 	
-	public void run() throws IOException {
-		
+	public void run() throws IOException {		
 		this.drivers.forEach(d -> threadPool.execute(d));
 	}
 	
-	public static SDCrawlingDriver getInstance() {
-		return (instance == null) ? instance = new SDCrawlingDriver() : instance;
+	public static Engine getInstance() {
+		return (instance == null) ? instance = new Engine() : instance;
 	}
 		
 	private List<EngineDriver> initializeDrivers() throws IOException {

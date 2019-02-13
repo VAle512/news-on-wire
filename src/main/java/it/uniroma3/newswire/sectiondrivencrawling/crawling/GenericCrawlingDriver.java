@@ -1,4 +1,4 @@
-package it.uniroma3.newswire.crawling;
+package it.uniroma3.newswire.sectiondrivencrawling.crawling;
 
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_DEPTH;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_NUM_CRAWLERS;
@@ -27,6 +27,7 @@ import scala.Tuple2;
 
 /**
  * This class is intended for crawling a Website to retrieves URLs and Link Occurrences.
+ * Da rimuovere.
  * @author Luigi D'Onofrio
  *
  */

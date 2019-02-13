@@ -1,4 +1,4 @@
-package it.uniroma3.newswire.crawling;
+package it.uniroma3.newswire.sectiondrivencrawling.drivers;
 
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.link;
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_NUM_CRAWLERS;
@@ -14,9 +14,11 @@ import it.uniroma3.newswire.classification.WebsiteClass;
 import it.uniroma3.newswire.persistence.ConcurrentPersister;
 import it.uniroma3.newswire.persistence.DAO;
 import it.uniroma3.newswire.properties.PropertiesReader;
+import it.uniroma3.newswire.sectiondrivencrawling.crawling.Crawler;
+import it.uniroma3.newswire.sectiondrivencrawling.crawling.CrawlingModel;
 
 /**
- * Questa è la classe che guida la fase di crawling.
+ * Questa è la classe che guida la fase di crawling nel section driven crawling.
  * @author Luigi D'Onofrio
  *
  */

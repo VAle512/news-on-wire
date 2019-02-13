@@ -1,4 +1,4 @@
-package it.uniroma3.newswire.crawling;
+package it.uniroma3.newswire.sectiondrivencrawling.drivers;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +14,7 @@ import org.apache.spark.mllib.tree.model.RandomForestModel;
 import it.uniroma3.newswire.classification.WebsiteClass;
 import it.uniroma3.newswire.classification.features.DataLoader;
 import it.uniroma3.newswire.properties.WebsiteConfiguration;
+import it.uniroma3.newswire.sectiondrivencrawling.conditions.SnapshotThreshold;
 import it.uniroma3.newswire.utils.EnvironmentVariables;
 import it.uniroma3.newswire.utils.URLUtils;
 

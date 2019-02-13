@@ -1,4 +1,4 @@
-package it.uniroma3.newswire.crawling;
+package it.uniroma3.newswire.sectiondrivencrawling.crawling;
 
 import static it.uniroma3.newswire.properties.PropertiesReader.CRAWLER_EXCLUDE_LIST;
 import static it.uniroma3.newswire.utils.URLUtils.canonicalize;
