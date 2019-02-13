@@ -7,8 +7,6 @@ import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referrin
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.relative;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.snapshot;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.depth;
-import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.file;
 import static it.uniroma3.newswire.properties.PropertiesReader.MYSQL_DB_URL_PLACEHOLDER;
 
 import java.sql.SQLException;
@@ -48,6 +46,7 @@ public class DataLoader {
 	private JavaRDD<Document> loadedData;
 	private JavaPairRDD<String, Integer> loadedGoldens;
 	private boolean toResume = Boolean.parseBoolean(propsReader.getProperty("data.load.resumable"));
+	private List<String> seeds;
 	
 	
 	/**
@@ -94,9 +93,9 @@ public class DataLoader {
 															              .append(relative.name(), 		row.getString(relative.ordinal()))
 															              .append(xpath.name(), 			row.getString(xpath.ordinal()))
 															              .append(snapshot.name(), 		row.getInt(snapshot.ordinal()))
-															              .append(date.name(), 				row.getTimestamp(date.ordinal()))
-															              .append(depth.name(), 			row.getInt(depth.ordinal()))
-															              .append(file.name(), 				row.getString(file.ordinal())))
+															              .append(date.name(), 				row.getTimestamp(date.ordinal())))
+//															              .append(depth.name(), 			row.getInt(depth.ordinal()))
+//															              .append(file.name(), 				row.getString(file.ordinal())))
 												.cache();
 	}
 	
@@ -125,7 +124,7 @@ public class DataLoader {
 		 */
 		logger.info("loading data between: " + this.currentSnapshot + " - " + toSnapshot);
 		
-		List<Document> partialResults = dao.getLinkOccurrenciesBeforeSnapshot(this.currentSnapshot, toSnapshot, isRange);
+		List<Document> partialResults = dao.getLinkOccurrenciesBeforeSnapshot(this.seeds,this.currentSnapshot, toSnapshot, isRange);
 		logger.info("Data retrieved from the Database for snapshot " + toSnapshot + ": " + partialResults.size());
 		
 		this.loadedData.unpersist();
@@ -147,7 +146,8 @@ public class DataLoader {
 		if(loadedGoldens != null)
 			return loadedGoldens;
 		else
-			return this.loadedGoldens = sqlContext.read()
+			try {
+				return this.loadedGoldens = sqlContext.read()
 											 	.format("jdbc")
 											 	.option("url", url)
 												.option("driver", DAO.JDBC_DRIVER)
@@ -158,10 +158,22 @@ public class DataLoader {
 												.toJavaRDD()
 												.mapToPair(row -> new Tuple2<>(row.getString(0), row.getInt(1)))
 												.cache();
+			}catch(Exception e) {
+				logger.error(e.getMessage());
+				return null;
+			}
 
 	}
 	
 	public void incrementSnapshotTo(int currentSnapshot) {
 		this.currentSnapshot =  currentSnapshot;
+	}
+	
+	public int getCurrentSnapshot() {
+		return this.currentSnapshot;
+	}
+	
+	public void setSeeds(List<String> seeds) {
+		this.seeds = seeds;
 	}
 }

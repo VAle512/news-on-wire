@@ -6,9 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
-import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.log4j.Logger;
 import org.spark_project.guava.collect.Lists;
 
 import com.google.common.io.Files;
@@ -18,92 +17,38 @@ import it.uniroma3.newswire.classification.features.Feature;
 import it.uniroma3.newswire.utils.EnvironmentVariables;
 import it.uniroma3.newswire.utils.URLUtils;
 
+/**
+ * Questo è il driver che guida la fase di Feature-Extraction.
+ * @author Luigi D'onofrio
+ *
+ */
 public class FeatureExtractionDriver {
+	private static Logger logger = Logger.getLogger(FeatureExtractionDriver.class);
 	private String root;
 	private List<Feature> features;
 	
-	public FeatureExtractionDriver(String websiteRootName, List<Feature> features) {
-		this.root = websiteRootName;
+	public FeatureExtractionDriver(String websiteRoot, List<Feature> features) {
+		this.root = websiteRoot;
 		this.features = features;
 	}
 	
 	public void extractFeatures(int snapshot, boolean persist) {
 		String dbName = URLUtils.getDatabaseNameOf(this.root);
 		File csvFile = new File(System.getenv(EnvironmentVariables.datasets) + "/simulation/" + dbName + "/" + dbName + "_" + snapshot + "_training.csv");
-		System.out.println(csvFile.getAbsolutePath());
-		System.out.println(features.stream().map(x -> x.getClass().getSimpleName()).collect(Collectors.toList()));
+		
+		/* Se il file esiste già non è necessario effettuare alcuna operazione di estrazione */
+		if(csvFile.exists()) {
+			logger.info("CSV already present! Skipping.");
+			return;
+		}
+		
+		/* Creiamo la mappa con URL e scores delle varie features. */
 		Map<String, List<Double>> url2Scores = new HashMap<>();
 
 		for(Feature feature: features) {
 			feature.calculate(persist, snapshot).collect().stream().forEach(x -> {
 				String key = x._1;
 				Double score = x._2;
-				if(url2Scores.containsKey(key)) {
-					url2Scores.get(key).add(score);
-				} else {
-					url2Scores.put(key, Lists.newArrayList(score));
-				}			
-			});
-		}
-		
-		int currentnumberOfFeatures = url2Scores.values().stream().mapToInt(x -> x.size()).max().getAsInt();
-		
-		/*
-		 * Ottieni i golden samples dal DB.
-		 */
-		Map<String, Integer> goldenClasses = DataLoader.getInstance().loadGoldenData(dbName).collectAsMap();
-		if(goldenClasses.size() == 0 || goldenClasses == null)
-			System.out.println("Impossibile trovare i golden. Fornirli e salvarli sul DB.");
-		
-		/* Appendiamo la classe */
-		//TODO: Spostare in altra classe per renedere modulare.
-		goldenClasses.forEach((k, v) -> {
-			if(url2Scores.containsKey(k))
-				url2Scores.get(k).add((double) v);
-		});
-		
-		/*
-		 * Cancelliamo il contenuto del file precedente (se esiste).
-		 */
-		try {
-			System.out.println(csvFile.getParentFile().mkdirs());
-			System.out.println(csvFile.createNewFile());
-			Files.write("", csvFile, StandardCharsets.UTF_8);
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		
-		url2Scores.entrySet().stream()
-								.filter(entry -> entry.getValue().size() < currentnumberOfFeatures)
-								.filter(entry -> !entry.getValue().contains(-1.))
-								.forEach(entry -> {
-									try {
-										StringBuilder line = new StringBuilder(entry.getKey());
-										entry.getValue().forEach(score -> line.append("," + score));
-										line.append("\n");
-										Files.append(line, csvFile, StandardCharsets.UTF_8);
-									} catch (IOException e) {
-										e.printStackTrace();
-									}
-								});
-		
-		DataLoader.getInstance().incrementSnapshotTo(snapshot);
-	}
-	
-	public void simulateExtractFeatures(List<String> urls, int snapshot, boolean persist) throws Exception {
-		String dbName = URLUtils.getDatabaseNameOf(this.root);
-		File csvFile = new File(System.getenv(EnvironmentVariables.datasets) + "/simulation/" + dbName + "/" + dbName + "_" + snapshot + "_training.csv");
-		
-		Map<String, List<Double>> url2Scores = new HashMap<>();
-
-		for(Feature feature: features) {
-			feature.calculate(persist, snapshot).foreach(x -> {
-				String key = x._1;
-				Double score = x._2;
-				/* Filtra su quelli effettivamente crawlati. */
-				if(!urls.contains(key))
-					return;
 				
 				if(url2Scores.containsKey(key)) {
 					url2Scores.get(key).add(score);
@@ -113,33 +58,30 @@ public class FeatureExtractionDriver {
 			});
 		}
 		
+		/*
+		 * Proviamo a creare il file, se esiste sscriviamo nulla al suo interno.
+		 */
+		try {
+			System.out.println(csvFile.getParentFile().mkdirs());
+			System.out.println(csvFile.createNewFile());
+			Files.write("", csvFile, StandardCharsets.UTF_8);
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
 		
+		/* Serve perchè potrebbero esserci delle features non calcolate correttamente o non essere proprio calcolate */
 		int currentnumberOfFeatures = url2Scores.values().stream().mapToInt(x -> x.size()).max().getAsInt();
 		
-		/*
-		 * Ottieni i golden samples dal DB.
-		 */
-		Map<String, Integer> goldenClasses = DataLoader.getInstance().loadGoldenData(dbName).collectAsMap();
-		if(goldenClasses.size() == 0 || goldenClasses == null)
-			throw new Exception("Impossibile trovare i golden. Fornirli e salvarli sul DB.");
+		/* Annotiamo le osservazioni. */
+		labelObservations(url2Scores);
 		
-		/* Appendiamo la classe */
-		//TODO: Spostare in altra classe per renedere modulare.
-		goldenClasses.forEach((k, v) -> {
-			if(url2Scores.containsKey(k))
-				url2Scores.get(k).add((double) v);
-		});
-		
-		/*
-		 * Cancelliamo il contenuto del file precedente (se esiste).
-		 */
-		Files.write("", csvFile, StandardCharsets.UTF_8);
-		
+		/* Andiamo a scrivere le osservazioni sul file .csv */
 		url2Scores.entrySet().stream()
-								.filter(entry -> entry.getValue().size() < currentnumberOfFeatures)
-								.filter(entry -> !entry.getValue().contains(-1.))
+								.filter(entry -> entry.getValue().size() == currentnumberOfFeatures + 1) // Filtriamo solo per URL correttamente estratti.
+								.filter(entry -> !entry.getValue().contains(-1.)) // Filtriamo solo per fatures calcolate correttamente.
 								.forEach(entry -> {
 									try {
+										/* Costruiamo la stringa da scrivere nel file .csv */
 										StringBuilder line = new StringBuilder(entry.getKey());
 										entry.getValue().forEach(score -> line.append("," + score));
 										line.append("\n");
@@ -149,7 +91,27 @@ public class FeatureExtractionDriver {
 									}
 								});
 		
-		DataLoader.getInstance().incrementSnapshotTo(snapshot);
 	}
-
+	
+	/**
+	 * Questo metodo serve ad aggiungere la label alle varie osservazioni.
+	 * @param url2Scores
+	 */
+	private void labelObservations(Map<String, List<Double>> url2Scores) {
+		String dbName = URLUtils.getDatabaseNameOf(this.root);
+		
+		/*
+		 * Ottieni i golden samples dal DB.
+		 */
+		Map<String, Integer> goldenClasses = DataLoader.getInstance().loadGoldenData(dbName).collectAsMap();
+		if(goldenClasses.size() == 0 || goldenClasses == null)
+			System.out.println("Impossibile trovare i golden. Fornirli e salvarli sul DB.");
+		
+		/* Appendiamo la classe */
+		goldenClasses.forEach((k, v) -> {
+			if(url2Scores.containsKey(k)) 
+				url2Scores.get(k).add((double) v);
+		});
+	}
+	
 }

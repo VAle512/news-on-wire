@@ -44,7 +44,6 @@ public class RandomForestClassifier {
 	 * @throws Exception
 	 */
 	public static Tuple3<RandomForestModel, MulticlassMetrics, Double> train(String websiteRoot,int snapshot, int featureCount, boolean simulation) throws Exception {
-		logger.info("Inizio fase classificazione. ");
 		String csvFolder = System.getenv(EnvironmentVariables.datasets);
 		String databaseName = URLUtils.getDatabaseNameOf(websiteRoot);	
 		String trainingSetPath;
@@ -52,7 +51,6 @@ public class RandomForestClassifier {
 			trainingSetPath = csvFolder + File.separator + databaseName + "_" + snapshot + "_training.csv";
 		else
 			trainingSetPath = csvFolder + File.separator + "simulation/" + databaseName + File.separator + databaseName + "_" + snapshot + "_training.csv";
-		System.out.println(trainingSetPath);
 		/*
 		 * Se esiste un training set pre-calcolato usa quello.
 		 */
@@ -99,8 +97,8 @@ public class RandomForestClassifier {
 													if(featureCount == 2)
 														j = 2;
 
-														vec[0] = Double.parseDouble(commaSplit[2]);
-														vec[1] = Double.parseDouble(commaSplit[1]);
+														vec[0] = Double.parseDouble(commaSplit[1]);
+														vec[1] = Double.parseDouble(commaSplit[2]);
 //													}
 													
 													/* XXX: Delete this shit for developing only
@@ -150,9 +148,12 @@ public class RandomForestClassifier {
 		 * Effettuiamo delle predizioni sul test set e calcoliamo tutte le metriche relative.
 		 */
 		JavaPairRDD<Object, Object> predictionAndLabels = testSet.mapToPair(p -> new Tuple2<>(model.predict(p.features()), p.label()));
+//		JavaPairRDD<Object, Object> lol = testSet.mapToPair(p -> new Tuple2<>(new Tuple2<>(p.features(),model.predict(p.features())), p.label()));
+		
+//		lol.collect().forEach(System.out::println);
+		
 		double testErr = predictionAndLabels.filter(pl -> !pl._1().equals(pl._2())).count() / (double) testSet.count();
 		
-//		predictionAndLabels.foreach(x -> System.out.println(x));
 		MulticlassMetrics metrics = new MulticlassMetrics(predictionAndLabels.rdd());
 //		printMetrics(metrics);
 //		System.out.println(testErr);

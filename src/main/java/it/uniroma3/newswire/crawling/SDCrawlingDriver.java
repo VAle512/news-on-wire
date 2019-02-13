@@ -23,7 +23,7 @@ import it.uniroma3.newswire.properties.WebsiteConfigurationReader;
 public class SDCrawlingDriver {
 	private static SDCrawlingDriver instance;
 	private static Logger logger = Logger.getLogger(SDCrawlingDriver.class);
-	private List<WebsiteProcessingDriver> drivers;
+	private List<EngineDriver> drivers;
 	private ExecutorService threadPool = Executors.newCachedThreadPool();
 	
 	private SDCrawlingDriver() {
@@ -43,8 +43,8 @@ public class SDCrawlingDriver {
 		return (instance == null) ? instance = new SDCrawlingDriver() : instance;
 	}
 		
-	private List<WebsiteProcessingDriver> initializeDrivers() throws IOException {
-		List<WebsiteProcessingDriver> drivers = new ArrayList<>();
+	private List<EngineDriver> initializeDrivers() throws IOException {
+		List<EngineDriver> drivers = new ArrayList<>();
 		
 		String configPath = System.getenv(envConfig);
 		File seedFile = new File(configPath + "/" + "seeds");
@@ -59,7 +59,7 @@ public class SDCrawlingDriver {
 			FeatureExtractionDriver featureExtractionDriver = new FeatureExtractionDriver(websiteRoot, websiteConf.getFeatures());
 			ClassificationDriver classificationDriver = new ClassificationDriver(websiteConf);
 			
-			drivers.add(new WebsiteProcessingDriver(crawlingDriver, featureExtractionDriver, classificationDriver, websiteConf));
+			drivers.add(new EngineDriver(crawlingDriver, featureExtractionDriver, classificationDriver, websiteConf));
 		}
 		
 		return drivers;

@@ -857,7 +857,7 @@ public class DAO implements Serializable{
 	 * Restituisce la lista di {@link Document} di occorrenze di link fra due snapshot.
 	 * Non mi piace per Information Expert: costringo una classe DAO a sapere dell'esistenza degli RDD.
 	 */
-	public List<Document> getLinkOccurrenciesBeforeSnapshot(int fromSnapshot, int toSnapshot, boolean isRange) {
+	public List<Document> getLinkOccurrenciesBeforeSnapshot(List<String> seeds, int fromSnapshot, int toSnapshot, boolean isRange) {
 		Connection connection = this.getConnection();
 		Statement stmnt = null;
 		ResultSet result = null;
@@ -875,10 +875,13 @@ public class DAO implements Serializable{
 															              .append(relative.name(), 		result.getString(relative.ordinal()+ 1))
 															              .append(xpath.name(), 			result.getString(xpath.ordinal()+ 1))
 															              .append(snapshot.name(), 		result.getInt(snapshot.ordinal()+ 1))
-															              .append(date.name(), 				result.getTimestamp(date.ordinal()+ 1))
-															              .append(depth.name(), 			result.getInt(depth.ordinal()+ 1))
-															              .append(file.name(), 				result.getString(file.ordinal()+ 1)));
-			return docs;
+															              .append(date.name(), 				result.getTimestamp(date.ordinal()+ 1)));
+//															              .append(depth.name(), 			result.getInt(depth.ordinal()+ 1))
+//															              .append(file.name(), 				result.getString(file.ordinal()+ 1)));
+			if(seeds != null)
+				return docs.stream().filter(x -> seeds.contains(x.getString(referringPage.name()))).collect(Collectors.toList());
+			else
+				return docs;
 		}catch(SQLException e) {
 			log(ERROR, e.getMessage());
 			return null;

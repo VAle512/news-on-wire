@@ -9,6 +9,6 @@ package it.uniroma3.newswire.classification;
  */
 public enum WebsiteClass {
 	news,
-	other,
-	section
+	section,
+	other
 }
