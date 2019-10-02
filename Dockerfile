@@ -28,5 +28,5 @@ WORKDIR target
 EXPOSE 4040
 
 # Run the jar
-CMD ["java","-jar","-Xms24g","-Xmx50g","-Dlogs=/app/logs","-Dcli=true","-Dforce-crawling=false","pages-classification-alpha-0.1.jar"]
+CMD ["java","-jar","-Dlogs=/app/logs","-Dcli=true","-Dforce-crawling=false","pages-classification-alpha-0.1.jar"]
 
