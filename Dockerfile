@@ -1,6 +1,7 @@
 FROM openjdk:8
 
 COPY ./target/pages-classification-alpha-0.1.jar /pages-classification-alpha-0.1.jar
+COPY ./src /app/src #temporary added this folder, while we solve log4j bug
 # COPY ./config /app/config
 
 ENV CONFIG_FOLDER=/app/config
