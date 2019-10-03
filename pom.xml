@@ -1,174 +1,163 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
 
-    <groupId>it.uniroma3</groupId>
-    <artifactId>pages-classification</artifactId>
-    <version>alpha-0.1</version>
-    <packaging>jar</packaging>    
+	<groupId>it.uniroma3</groupId>
+	<artifactId>pages-classification</artifactId>
+	<version>alpha-0.1</version>
+	<packaging>jar</packaging>
+
 	<build>
-		<resources>
-    		<resource>
-     			<directory>src/main/resources</directory>
-    		</resource>
-   		</resources>
-   		
-   		<plugins>
-    		<plugin>
-      			<!-- Build an executable JAR -->
-      			<groupId>org.apache.maven.plugins</groupId>
-      			<artifactId>maven-jar-plugin</artifactId>
-      			<version>3.1.0</version>
-      			<configuration>
-        			<archive>
-          				<manifest>
-          					<addClasspath>true</addClasspath>
-                        	<classpathPrefix>${project.build.directory}/dependency</classpathPrefix>
-            				<mainClass>it.uniroma3.newswire.cli.Init</mainClass>
-          				</manifest>
-        			</archive>
-      			</configuration>
-    		</plugin>
-    		
-    		<plugin>
-    			<groupId>org.apache.maven.plugins</groupId>
-    			<artifactId>maven-dependency-plugin</artifactId>
-    			<version>3.0.0</version>
-    			<executions>
-      				<execution>
-        				<id>copy-dependencies</id>
-        				<phase>package</phase>
-        				<goals>
-          					<goal>copy-dependencies</goal>
-        				</goals>
-        				<configuration>
-          					<outputDirectory>${project.build.directory}/dependency</outputDirectory>
-          					<overWriteReleases>false</overWriteReleases>
-          					<overWriteSnapshots>false</overWriteSnapshots>
-          					<overWriteIfNewer>true</overWriteIfNewer>
-        				</configuration>
-      				</execution>
-    			</executions>
-  			</plugin>
-  		</plugins>
-   	
-  	</build>
-	
-    <name>pages-classification</name>
-    <url>http://maven.apache.org</url>
-	
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <jaxb-api.version>2.3.0</jaxb-api.version>
-        <maven.compiler.source>1.8</maven.compiler.source>
-    	<maven.compiler.target>1.8</maven.compiler.target>
-    </properties>
+		<plugins>
+			<plugin>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.6.1</version>
+				<configuration>
+					<source>1.8</source>
+					<target>1.8</target>
+				</configuration>
+			</plugin>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<configuration>
+					<archive>
+						<manifest>
+							<mainClass>it.uniroma3.newswire.cli.Init</mainClass>
+						</manifest>
+					</archive>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+				</configuration>
+				<executions>
+					<execution>
+						<id>make-assembly</id> <!-- this is used for inheritance merges -->
+						<phase>package</phase> <!-- bind to the packaging phase -->
+						<goals>
+							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 
-    <dependencies>           
-        <dependency>
-            <groupId>org.mongodb</groupId>
-            <artifactId>mongo-java-driver</artifactId>
-            <version>3.8.2</version>
-        </dependency>
+	<name>pages-classification</name>
+	<url>http://maven.apache.org</url>
 
-        <dependency>
-            <groupId>org.mongodb.spark</groupId>
-            <artifactId>mongo-spark-connector_2.11</artifactId>
-            <version>2.3.0</version>
-        </dependency>
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<jaxb-api.version>2.3.0</jaxb-api.version>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+	</properties>
 
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-sql_2.11</artifactId>
-            <version>2.4.0</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-mllib_2.11</artifactId>
-            <version>2.4.0</version>
-        </dependency>
+	<dependencies>
+		<dependency>
+			<groupId>org.mongodb</groupId>
+			<artifactId>mongo-java-driver</artifactId>
+			<version>3.8.2</version>
+		</dependency>
 
-    	<dependency>
-            <groupId>edu.uci.ics</groupId>
-            <artifactId>crawler4j</artifactId>
-            <version>4.4.0</version>
-            <exclusions>
-            	<exclusion>
-            		<groupId>ch.qos.logback</groupId>
-                	<artifactId>logback-classic</artifactId>
-            	</exclusion>
-            </exclusions>
-        </dependency>
-    
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>15.0</version>
-        </dependency>
+		<dependency>
+			<groupId>org.mongodb.spark</groupId>
+			<artifactId>mongo-spark-connector_2.11</artifactId>
+			<version>2.3.0</version>
+		</dependency>
 
-        <dependency>
-            <groupId>org.neo4j.driver</groupId>
-            <artifactId>neo4j-java-driver</artifactId>
-            <version>1.6.3</version>
-        </dependency>
-        
-        <dependency>
-    		<groupId>org.jsoup</groupId>
-    		<artifactId>jsoup</artifactId>
-    		<version>1.11.3</version>
-		</dependency>
-		
 		<dependency>
-    		<groupId>org.jooq</groupId>
-    		<artifactId>joox</artifactId>
-    		<version>1.5.0</version>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-sql_2.11</artifactId>
+			<version>2.4.0</version>
 		</dependency>
-		
-    	<dependency>
-    		<groupId>mysql</groupId>
-    		<artifactId>mysql-connector-java</artifactId>
-    		<version>8.0.12</version>
-		</dependency>
-		
-		<dependency>
-    		<groupId>org.apache.commons</groupId>
-    		<artifactId>commons-dbcp2</artifactId>
-    		<version>2.5.0</version>
-		</dependency>
-		
-		<dependency>
-  			<groupId>me.tongfei</groupId>
-  			<artifactId>progressbar</artifactId>
-  			<version>0.7.2</version>
-		</dependency>
-		
-		<dependency>
-    		<groupId>org.jfree</groupId>
-    		<artifactId>jfreechart</artifactId>
-    		<version>1.5.0</version>
-		</dependency>
-		
-		<dependency>
-    		<groupId>org.apache.poi</groupId>
-    		<artifactId>poi-ooxml</artifactId>
-    		<version>3.17</version>
-		</dependency>
-		
-		<dependency>
-      		<groupId>com.github.haifengl</groupId>
-      		<artifactId>smile-core</artifactId>
-      		<version>1.5.2</version>
-    	</dependency>
-		
-    </dependencies>
 
-    <repositories>
-      <!-- list of other repositories -->
-        <repository>
-            <id>SparkPackagesRepo</id>
-            <url>http://dl.bintray.com/spark-packages/maven</url>
-        </repository>
-    </repositories>
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-mllib_2.11</artifactId>
+			<version>2.4.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>edu.uci.ics</groupId>
+			<artifactId>crawler4j</artifactId>
+			<version>4.4.0</version>
+			<exclusions>
+				<exclusion>
+					<groupId>ch.qos.logback</groupId>
+					<artifactId>logback-classic</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<dependency>
+			<groupId>com.google.guava</groupId>
+			<artifactId>guava</artifactId>
+			<version>15.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.neo4j.driver</groupId>
+			<artifactId>neo4j-java-driver</artifactId>
+			<version>1.6.3</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.11.3</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.jooq</groupId>
+			<artifactId>joox</artifactId>
+			<version>1.5.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>mysql</groupId>
+			<artifactId>mysql-connector-java</artifactId>
+			<version>8.0.12</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-dbcp2</artifactId>
+			<version>2.5.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>me.tongfei</groupId>
+			<artifactId>progressbar</artifactId>
+			<version>0.7.2</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.jfree</groupId>
+			<artifactId>jfreechart</artifactId>
+			<version>1.5.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>3.17</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.github.haifengl</groupId>
+			<artifactId>smile-core</artifactId>
+			<version>1.5.2</version>
+		</dependency>
+
+	</dependencies>
+
+	<repositories>
+		<!-- list of other repositories -->
+		<repository>
+			<id>SparkPackagesRepo</id>
+			<url>http://dl.bintray.com/spark-packages/maven</url>
+		</repository>
+	</repositories>
 </project>
         
