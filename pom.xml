@@ -55,12 +55,6 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>org.mongodb</groupId>
-			<artifactId>mongo-java-driver</artifactId>
-			<version>3.8.2</version>
-		</dependency>
-
-		<dependency>
 			<groupId>org.mongodb.spark</groupId>
 			<artifactId>mongo-spark-connector_2.11</artifactId>
 			<version>2.3.0</version>
@@ -94,12 +88,6 @@
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
 			<version>15.0</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.neo4j.driver</groupId>
-			<artifactId>neo4j-java-driver</artifactId>
-			<version>1.6.3</version>
 		</dependency>
 
 		<dependency>

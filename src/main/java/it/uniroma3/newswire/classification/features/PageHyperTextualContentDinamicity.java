@@ -1,6 +1,5 @@
 package it.uniroma3.newswire.classification.features;
 
-import static it.uniroma3.newswire.benchmark.utils.LinkCollectionFinder.findCollections;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.id;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.link;
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.referringPage;
@@ -8,23 +7,12 @@ import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.snapshot
 import static it.uniroma3.newswire.persistence.schemas.LinkOccourrences.xpath;
 import static org.apache.log4j.Level.INFO;
 
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.stream.Collectors;
-
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.storage.StorageLevel;
-import org.neo4j.driver.internal.util.Iterables;
 
 import com.google.common.collect.Lists;
-import com.google.common.collect.Sets;
 
-import it.uniroma3.newswire.persistence.DAO;
-import it.uniroma3.newswire.properties.PropertiesReader;
-import it.uniroma3.newswire.spark.SparkLoader;
 import scala.Tuple2;
-import scala.Tuple3;
 import scala.Tuple4;
 
 /**
@@ -48,7 +36,6 @@ public class PageHyperTextualContentDinamicity extends Feature{
 	/* (non-Javadoc)
 	 * @see it.uniroma3.analysis.Analysis#analyze(boolean)
 	 */
-	@SuppressWarnings("unchecked")
 	public JavaPairRDD<String, Double> calculate(boolean persistResults, int untilSnapshot) {
 		log(INFO, "started");
 		
