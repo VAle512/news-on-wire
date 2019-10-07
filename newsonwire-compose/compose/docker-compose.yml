@@ -1,4 +1,4 @@
-# Use root/example as user/password credentials
+# Use root/password as user/password credentials
 version: '3'
 
 services:
@@ -15,8 +15,9 @@ services:
 
   newsonwire:
     image: newsonwire
-    # Sovrascrive il comando di default (-Xms, -Xmx rimossi)
-    command: ["java", "-jar", "-Dlogs=/app/logs", "-Dcli=true", "-Dforce-crawling=false", "pages-classification-alpha-0.1-jar-with-dependencies.jar"]
+    # Original command by Luigi
+    # command: ["java","-jar","-Xms24g","-Xmx50g","-Dlogs=/app/logs","-Dcli=true","-Dforce-crawling=false","pages-classification-alpha-0.1-jar-with-dependencies.jar"]
+    command: dockerize -wait tcp://mysqldb:3306 -timeout 3m java -jar -Dlogs=/app/logs -Dcli=true -Dforce-crawling=false pages-classification-alpha-0.1-jar-with-dependencies.jar
     volumes:
      - ./app/config:/app/config
      - ./app/data:/app/data
@@ -26,6 +27,7 @@ services:
      - ./app/results:/app/results
     depends_on:
      - mysqldb
+     - adminer
     ports:
      - 4040:4040
     

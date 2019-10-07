@@ -20,14 +20,12 @@ ENV CONFIG_FOLDER=/app/config \
 # Set working dir
 WORKDIR /app/target
 
-# Copy script for awaiting db ready
-COPY ./wait-for-it.sh /
+# Install Dockerize that allows to wait for a service ready
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+ENV DOCKERIZE_VERSION v0.6.1
+RUN wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz \
+    && rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
 
 # Publish port on wich will be displayed spark application
 EXPOSE 4040
-
-# Default command by Luigi (overwriteable at runtime)
-CMD ["java","-jar","-Xms24g","-Xmx50g","-Dlogs=/app/logs","-Dcli=true","-Dforce-crawling=false","pages-classification-alpha-0.1-jar-with-dependencies.jar"]
-
-
-
