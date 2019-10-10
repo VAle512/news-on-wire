@@ -15,9 +15,16 @@ services:
 
   newsonwire:
     image: newsonwire
+    
     # Original command by Luigi
-    # command: ["java","-jar","-Xms24g","-Xmx50g","-Dlogs=/app/logs","-Dcli=true","-Dforce-crawling=false","pages-classification-alpha-0.1-jar-with-dependencies.jar"]
-    command: dockerize -wait tcp://mysqldb:3306 -timeout 3m java -jar -Dlogs=/app/logs -Dcli=true -Dforce-crawling=false pages-classification-alpha-0.1-jar-with-dependencies.jar
+    #command: ["java","-jar","-Xms24g","-Xmx50g","-Dlogs=/app/logs","-Dcli=true","-Dforce-crawling=false","pages-classification-alpha-0.1-jar-with-dependencies.jar"]
+    
+    # CRAWLING mode command (comment to disable crawling mode startup):
+    command: dockerize -wait tcp://mysqldb:3306 -timeout 3m java -jar -Dlogs=/app/logs -Dcli=false -Dforce-crawling=true pages-classification-alpha-0.1-jar-with-dependencies.jar    
+    
+    # CLASSIFICATION mode command (comment to disable classification mode startup):
+    #command: dockerize -wait tcp://mysqldb:3306 -timeout 3m java -jar -Dlogs=/app/logs -Dcli=true -Dforce-crawling=false pages-classification-alpha-0.1-jar-with-dependencies.jar 
+    
     volumes:
      - ./app/config:/app/config
      - ./app/data:/app/data

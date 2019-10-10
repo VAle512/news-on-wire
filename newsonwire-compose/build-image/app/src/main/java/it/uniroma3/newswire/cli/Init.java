@@ -35,10 +35,10 @@ public class Init {
 		boolean forceCrawlOnly = Boolean.parseBoolean(System.getProperty(FORCE_CRAWLING_PROPERTY));
 		boolean useCLI = Boolean.parseBoolean(System.getProperty(USE_CLI_PROPERTY));
 		
-//		if(forceCrawlOnly)
+		if(forceCrawlOnly)
 			doCrawl();
-//		else if (useCLI)
-//			CLI.showCLI();
+		else if (useCLI)
+			CLI.showCLI();
 	
 	}
 	
